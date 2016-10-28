@@ -1,0 +1,25 @@
+Project Grammar
+
+Essentially we want to represent the location of the head and the direction of the head in 3d space
+series of statements 
+push onto stack
+pop off of stack
+statement : motion of the head, toggle add or subtract , push on off stack, 
+move x y z r: where x, y, z, r are all functions of t
+
+<program> : <define>* <statement>
+
+<define> : "( DEFINE" <identifier> "(" <param>* ")" <statement> ")" ";"
+
+<param> : <identifier>
+
+<statement> : MOVE <expr> <expr> <expr> <expr> ";" <statement> # x y z r(radius) <special param is "t">
+<statement> : "[" <statement> "]" ";" <statement>  #stack push/pop
+<statement> : nothing
+<statement> : "{" <identifier> <param>* "}" ";" <statement>
+<statement> : "IF" <expr> "THEN" <statement> "ELSE" <statement> ";" <statement>
+
+<expr> : <expr> + <expr> | <expr> - <expr> | <expr> *  <expr>
+<expr> : <identifier> | <num>
+
+<identifier> : [a-z][a-zA-Z]*
