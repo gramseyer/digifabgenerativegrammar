@@ -9,7 +9,7 @@ data Definition = DEFINE Identifier [Identifier] Statement
 
 data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_STACKMANIP Statement Statement
-                | ST_NOTHING
+                | ST_EMPTY
                 | ST_APPLY Identifier [Param] Statement
                 | ST_COND Expr Statement Statement Statement
                 deriving Show
@@ -28,6 +28,84 @@ data Expr = EXP_ADD Expr Expr
 
 data Identifier = ID String deriving Show
 
+program :: Parser Program
+program = do
+    definitions <- many definition
+    action <- statement
+    return $ PROGRAM definitions action
+
+definition :: Parser Definition
+definition = do
+    char '('
+    string "DEFINE"
+    iden <- identifier
+    char '('
+    vars <- many identifier
+    char ')'
+    action <- statement
+    char ')'
+    return $ DEFINE iden vars action
+
+param :: Parser Param
+param = try paramID <|> paramNum 
+
+paramID :: Parser Param 
+paramID = do
+    test <- identifier
+    return $ PARAM_ID test
+
+paramNum :: Parser Param 
+paramNum = do
+    test <- numParse
+    return $ PARAM_NUM test
+
+statement :: Parser Statement 
+statement = try stMove <|> try stStack <|> try stCond <|> try stApply <|> stEmpty
+
+stMove :: Parser Statement
+stMove = do
+    string "MOVE"
+    x <- topExpr
+    y <- topExpr
+    z <- topExpr
+    r <- topExpr
+    char ';'
+    remain <- statement
+    return $ ST_MOVE x y z r remain
+
+stStack :: Parser Statement
+stStack = do
+    char '['
+    states <- statement 
+    char ']'
+    char ';'
+    remain <- statement
+    return $ ST_STACKMANIP states remain
+
+stCond :: Parser Statement
+stCond = do
+    string "IF" 
+    bool <- topExpr
+    string "THEN"
+    true <- statement
+    string "ELSE"
+    false <- statement
+    char ';'
+    remain <- statement
+    return $ ST_COND bool true false remain
+
+stApply :: Parser Statement
+stApply = do
+    char '}'
+    iden <- identifier
+    params <- many param 
+    char '}'
+    char ';'
+    remain <- statement
+    return $ ST_APPLY iden params remain
+
+stEmpty :: Parser Statement
+stEmpty = return ST_EMPTY
 
 identifier :: Parser Identifier
 identifier = do
