@@ -12,6 +12,9 @@ data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_EMPTY
                 | ST_APPLY Identifier [Param] Statement
                 | ST_COND Expr Statement Statement Statement
+                | ST_ROTATEX Float Statement
+                | ST_ROTATEY Float Statement
+                | ST_ROTATEZ Float Statement
                 deriving Show
 
 data Param = PARAM_ID Identifier
@@ -60,7 +63,7 @@ paramNum = do
     return $ PARAM_NUM test
 
 statement :: Parser Statement 
-statement = try stMove <|> try stStack <|> try stCond <|> try stApply <|> stEmpty
+statement = try stMove <|> try stStack <|> try stCond <|> try stApply <|> try stRotateX <|> try stRotateY <|> try stRotateZ <|> stEmpty
 
 stMove :: Parser Statement
 stMove = do
@@ -96,13 +99,37 @@ stCond = do
 
 stApply :: Parser Statement
 stApply = do
-    char '}'
+    char '{'
     iden <- identifier
     params <- many param 
     char '}'
     char ';'
     remain <- statement
     return $ ST_APPLY iden params remain
+
+stRotateX :: Parser Statement
+stRotateX = do
+    string "ROTATEX"
+    rot <- numParse
+    char ';'
+    remain <- statement
+    return $ ST_ROTATEX rot remain
+
+stRotateY :: Parser Statement
+stRotateY = do
+    string "ROTATEY"
+    rot <- numParse
+    char ';'
+    remain <- statement
+    return $ ST_ROTATEY rot remain
+
+stRotateZ :: Parser Statement
+stRotateZ = do
+    string "ROTATEZ"
+    rot <- numParse
+    char ';'
+    remain <- statement
+    return $ ST_ROTATEZ rot remain
 
 stEmpty :: Parser Statement
 stEmpty = return ST_EMPTY
