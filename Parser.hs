@@ -40,13 +40,20 @@ program = do
 definition :: Parser Definition
 definition = do
     char '('
+    whiteSpace
     string "DEFINE"
+    whiteSpace
     iden <- identifier
+    whiteSpace
     char '('
+    whiteSpace
     vars <- many identifier
+    whiteSpace
     char ')'
+    whiteSpace
     action <- statement
     char ')'
+    whiteSpace
     return $ DEFINE iden vars action
 
 param :: Parser Param
@@ -55,11 +62,13 @@ param = try paramID <|> paramNum
 paramID :: Parser Param 
 paramID = do
     test <- identifier
+    whiteSpace
     return $ PARAM_ID test
 
 paramNum :: Parser Param 
 paramNum = do
     test <- numParse
+    whiteSpace
     return $ PARAM_NUM test
 
 statement :: Parser Statement 
@@ -68,66 +77,91 @@ statement = try stMove <|> try stStack <|> try stCond <|> try stApply <|> try st
 stMove :: Parser Statement
 stMove = do
     string "MOVE"
+    whiteSpace
     x <- topExpr
     y <- topExpr
     z <- topExpr
     r <- topExpr
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_MOVE x y z r remain
 
 stStack :: Parser Statement
 stStack = do
     char '['
+    whiteSpace
     states <- statement 
     char ']'
+    whiteSpace
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_STACKMANIP states remain
 
 stCond :: Parser Statement
 stCond = do
-    string "IF" 
+    string "IF"
+    whiteSpace 
     bool <- topExpr
+    whiteSpace
     string "THEN"
+    whiteSpace
     true <- statement
+    whiteSpace
     string "ELSE"
+    whiteSpace
     false <- statement
+    whiteSpace
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_COND bool true false remain
 
 stApply :: Parser Statement
 stApply = do
     char '{'
+    whiteSpace
     iden <- identifier
+    whiteSpace
     params <- many param 
     char '}'
+    whiteSpace
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_APPLY iden params remain
 
 stRotateX :: Parser Statement
 stRotateX = do
     string "ROTATEX"
+    whiteSpace
     rot <- numParse
+    whiteSpace
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_ROTATEX rot remain
 
 stRotateY :: Parser Statement
 stRotateY = do
     string "ROTATEY"
+    whiteSpace
     rot <- numParse
+    whiteSpace
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_ROTATEY rot remain
 
 stRotateZ :: Parser Statement
 stRotateZ = do
     string "ROTATEZ"
+    whiteSpace
     rot <- numParse
+    whiteSpace
     char ';'
+    whiteSpace
     remain <- statement
     return $ ST_ROTATEZ rot remain
 
@@ -138,6 +172,7 @@ identifier :: Parser Identifier
 identifier = do
     first <- lower
     rest <- many alphaNum
+    whiteSpace
     return $ ID (first : rest)
 
 addSubExpr :: Parser Expr
@@ -146,14 +181,18 @@ addSubExpr = try addExpr <|> try subExpr <|> multDivExpr
 addExpr :: Parser Expr
 addExpr = do
     left <- multDivExpr
+    whiteSpace
     char '+'
+    whiteSpace
     remain <- addSubExpr
     return $ EXP_ADD left remain
 
 subExpr :: Parser Expr
 subExpr = do
     left <- multDivExpr
+    whiteSpace
     char '-'
+    whiteSpace
     remain <- addSubExpr
     return $ EXP_SUB left remain
 
@@ -163,20 +202,27 @@ multDivExpr = try multExpr <|> try divExpr <|> terminalExpr
 multExpr :: Parser Expr
 multExpr = do
     left <- terminalExpr
+    whiteSpace
     char '*'
+    whiteSpace
     remain <- multDivExpr 
     return $ EXP_MULT left remain
 
 divExpr :: Parser Expr
 divExpr = do
     left <- terminalExpr
+    whiteSpace
     char '/'
+    whiteSpace
     remain <- multDivExpr 
     return $ EXP_DIV left remain
 
 
 terminalExpr :: Parser Expr
-terminalExpr = try topExpr <|> try varExpr <|> numExpr
+terminalExpr = do
+    result <- (try topExpr <|> try varExpr <|> numExpr)
+    whiteSpace
+    return result
 
 topExpr :: Parser Expr
 topExpr = do
@@ -218,3 +264,15 @@ negExpr = do
     char '~'
     test <- numParse
     return $ EXP_NUM (-test)
+
+whiteSpace :: Parser ()
+whiteSpace = do
+    many (satisfy isWhiteSpace)
+    return ()
+    
+
+isWhiteSpace :: Char -> Bool
+isWhiteSpace ' ' = True
+isWhiteSpace '\n' = True
+isWhiteSpace '\t' = True
+isWhiteSpace _ = False
