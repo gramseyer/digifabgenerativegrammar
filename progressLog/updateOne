@@ -3,7 +3,7 @@ Hannah Brodheim and Geoffrey Ramseyer
 
 Defined initial project grammar and wrote haskell parser.
 
-The haskell parser is below and has been tested to correctly read our defined grammar.  The Backus-Naur grammar is below 
+The haskell parser is below and has been tested to correctly read our defined grammar.  The Backus-Naur grammar is below.  All code will be located at https://github.com/gramseyer/digifabgenerativegrammar.
 
 <program> : <define>* <statement>
 		  ;
