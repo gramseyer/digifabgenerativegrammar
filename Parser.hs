@@ -31,6 +31,9 @@ data Expr = EXP_ADD Expr Expr
 
 data Identifier = ID String deriving Show
 
+parseProgram :: String -> Either ParseError Program
+parseProgram = parse program "Invalid Parse"
+
 program :: Parser Program
 program = do
     definitions <- many definition
