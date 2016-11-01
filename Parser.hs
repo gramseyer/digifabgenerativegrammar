@@ -1,3 +1,5 @@
+module Parser(Program, Definition, Statement, Param, Expr, Identifier, parseProgram) where
+
 import Text.ParserCombinators.Parsec
 import System.Environment
 
@@ -38,6 +40,7 @@ program :: Parser Program
 program = do
     definitions <- many definition
     action <- statement
+    eof
     return $ PROGRAM definitions action
 
 definition :: Parser Definition
