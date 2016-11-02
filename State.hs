@@ -49,3 +49,7 @@ pushHeadToStack = state $ \(TOTAL f e (PERSIST h stk records)) -> ((), TOTAL f e
 
 popHeadFromStack :: Model HeadState
 popHeadFromStack = state $ \(TOTAL f e (PERSIST _ (h:stk) records)) -> (h, TOTAL f e (PERSIST h stk records))
+
+--example of how to throw an error
+errTest :: String -> Model ()
+errTest str = throwError str
