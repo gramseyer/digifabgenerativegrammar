@@ -1,4 +1,4 @@
-module State (Model, HeadState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings) where
+module State (Model, HeadState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -65,7 +65,24 @@ popVarBindings = state $ \(TOTAL f (EPHEMERAL (m:m')) p) -> (m, TOTAL f (EPHEMER
 addBinding :: (Parser.Identifier, Float) -> Map.Map Parser.Identifier Float -> Map.Map Parser.Identifier Float
 addBinding (key, value) bindings = Map.insert key value bindings
 
---example of how to throw an error
-errTest :: String -> Model ()
-errTest str = throwError str
+addDefinitions :: [Parser.Definition] -> Model ()
+addDefinitions funcs = state $ \(TOTAL (FIXED prevMap) e p) -> 
+                            ((), TOTAL (FIXED (List.foldr addDefinition prevMap funcs)) e p)
+
+addDefinition :: Parser.Definition -> Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement) -> Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement)
+addDefinition (DEFINE name args statement) defns = Map.insert name (args, statement) defns
+
+getDefinitions :: Model (Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement))
+getDefinitions = state $ \(TOTAL (FIXED prevMap) e p) -> (prevMap, TOTAL (FIXED prevMap) e p)
+
+
+findDefinition :: Parser.Identifier -> Model ([Parser.Identifier], Parser.Statement)
+findDefinition identifier = do
+    defns <- getDefinitions
+    unpackDefn identifier (Map.lookup identifier defns)
+
+unpackDefn :: Parser.Identifier -> Maybe ([Parser.Identifier], Parser.Statement) -> Model ([Parser.Identifier], Parser.Statement)
+unpackDefn var Nothing = throwError ("Function " ++ var ++ " is not defined")
+unpackDefn _ (Just result) = do
+    return result
 

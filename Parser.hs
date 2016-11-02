@@ -1,4 +1,4 @@
-module Parser(Program, Definition, Statement, Param, Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
+module Parser(Program, Definition (DEFINE), Statement, Param, Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
