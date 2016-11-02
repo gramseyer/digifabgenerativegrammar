@@ -75,7 +75,6 @@ addDefinition (DEFINE name args statement) defns = Map.insert name (args, statem
 getDefinitions :: Model (Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement))
 getDefinitions = state $ \(TOTAL (FIXED prevMap) e p) -> (prevMap, TOTAL (FIXED prevMap) e p)
 
-
 findDefinition :: Parser.Identifier -> Model ([Parser.Identifier], Parser.Statement)
 findDefinition identifier = do
     defns <- getDefinitions

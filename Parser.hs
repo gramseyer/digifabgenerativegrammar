@@ -1,10 +1,10 @@
-module Parser(Program, Definition (DEFINE), Statement, Param, Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
+module Parser(Program (PROGRAM), Definition (DEFINE), Statement, Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
 
 data Program = PROGRAM [Definition] Statement
-               deriving Show
+                deriving Show
 
 data Definition = DEFINE Identifier [Identifier] Statement
                   deriving Show
