@@ -1,7 +1,8 @@
 
 import Parser
 import qualified Data.Map as Map
-import Control.Monad.State (State, state)
+import Control.Monad.State
+import Control.Monad.Except
 
 data HeadState = HEADSTATE Position Orientation Action
 
@@ -30,7 +31,7 @@ data EphemeralState = EPHEMERAL (Map.Map Parser.Identifier Float)
 
 data TotalState = TOTAL FixedState EphemeralState PersistState
 
-type Model = State TotalState
+type Model a = ExceptT String (State TotalState) a --StateT s (Either String) TotalState
 
 {-evalMotion :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> State TotalState
 evalMotion x y z r
@@ -41,7 +42,7 @@ evalStatement (Parser.ST_MOVE x y z r stm) = do
 -}
 
 getHeadState :: Model HeadState
-getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) -> (h, TOTAL f e (PERSIST h stk records))
+getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) ->  (h,(TOTAL f e (PERSIST h stk records)))
 
 pushHeadToStack :: Model ()
 pushHeadToStack = state $ \(TOTAL f e (PERSIST h stk records)) -> ((), TOTAL f e (PERSIST h (h:stk) records))
