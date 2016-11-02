@@ -14,22 +14,32 @@ data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_EMPTY
                 | ST_APPLY Identifier [Param] Statement
                 | ST_COND Expr Statement Statement Statement
-                | ST_ROTATEX Float Statement
-                | ST_ROTATEY Float Statement
-                | ST_ROTATEZ Float Statement
+                | ST_ROTATEX Expr Statement
+                | ST_ROTATEY Expr Statement
+                | ST_ROTATEZ Expr Statement
                 deriving Show
 
 data Param = PARAM_ID Identifier
             | PARAM_NUM Float
             deriving Show
 
-data Expr = EXP_ADD Expr Expr
-            | EXP_SUB Expr Expr
-            | EXP_MULT Expr Expr
-            | EXP_DIV Expr Expr
+data Expr = EXP_BINOP Expr Expr (Float -> Float -> Float)
             | EXP_VAR Identifier
             | EXP_NUM Float  
-            deriving Show   
+
+instance Show Expr where
+    show (EXP_VAR identifier) = "EXP_VAR " ++ (show identifier)
+    show (EXP_NUM number) = "EXP_NUM " ++ (show number)
+    show (EXP_BINOP e1 e2 func) = case (func 3 3) of 
+            6 -> "EXP_ADD " ++ (showBinop e1 e2)
+            0 -> "EXP_SUB " ++ (showBinop e1 e2)
+            9 -> "EXP_MUL " ++ (showBinop e1 e2)
+            1 -> "EXP_DIV " ++ (showBinop e1 e2)
+            _ -> "EXP_BINOP " ++ (showBinop e1 e2)
+            where
+
+showBinop e1 e2 = "(" ++ (show e1) ++ ") (" ++ (show e2) ++")"
+
 
 data Identifier = ID String deriving Show
 
@@ -142,7 +152,7 @@ stRotateX :: Parser Statement
 stRotateX = do
     string "ROTATEX"
     whiteSpace
-    rot <- numParse
+    rot <- topExpr
     whiteSpace
     char ';'
     whiteSpace
@@ -153,7 +163,7 @@ stRotateY :: Parser Statement
 stRotateY = do
     string "ROTATEY"
     whiteSpace
-    rot <- numParse
+    rot <- topExpr
     whiteSpace
     char ';'
     whiteSpace
@@ -164,7 +174,7 @@ stRotateZ :: Parser Statement
 stRotateZ = do
     string "ROTATEZ"
     whiteSpace
-    rot <- numParse
+    rot <- topExpr
     whiteSpace
     char ';'
     whiteSpace
@@ -191,7 +201,7 @@ addExpr = do
     char '+'
     whiteSpace
     remain <- addSubExpr
-    return $ EXP_ADD left remain
+    return $ EXP_BINOP left remain (+)
 
 subExpr :: Parser Expr
 subExpr = do
@@ -200,7 +210,7 @@ subExpr = do
     char '-'
     whiteSpace
     remain <- addSubExpr
-    return $ EXP_SUB left remain
+    return $ EXP_BINOP left remain (-)
 
 multDivExpr :: Parser Expr
 multDivExpr = try multExpr <|> try divExpr <|> terminalExpr
@@ -212,7 +222,7 @@ multExpr = do
     char '*'
     whiteSpace
     remain <- multDivExpr 
-    return $ EXP_MULT left remain
+    return $ EXP_BINOP left remain (*)
 
 divExpr :: Parser Expr
 divExpr = do
@@ -221,7 +231,7 @@ divExpr = do
     char '/'
     whiteSpace
     remain <- multDivExpr 
-    return $ EXP_DIV left remain
+    return $ EXP_BINOP left remain (/)
 
 
 terminalExpr :: Parser Expr
