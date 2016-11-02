@@ -1,4 +1,4 @@
-module Parser(Program, Definition, Statement, Param, Expr, Identifier, parseProgram) where
+module Parser(Program, Definition, Statement, Param, Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
@@ -40,8 +40,7 @@ instance Show Expr where
 
 showBinop e1 e2 = "(" ++ (show e1) ++ ") (" ++ (show e2) ++")"
 
-
-data Identifier = ID String deriving Show
+type Identifier = String
 
 parseProgram :: String -> Either ParseError Program
 parseProgram = parse program "Invalid Parse"
@@ -189,7 +188,7 @@ identifier = do
     first <- lower
     rest <- many alphaNum
     whiteSpace
-    return $ ID (first : rest)
+    return $ (first : rest)
 
 addSubExpr :: Parser Expr
 addSubExpr = try addExpr <|> try subExpr <|> multDivExpr
