@@ -1,4 +1,4 @@
-module State (Model, HeadState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State (Model, runModel, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -35,13 +35,14 @@ data TotalState = TOTAL FixedState EphemeralState PersistState
 
 type Model a = ExceptT String (State TotalState) a --StateT s (Either String) TotalState
 
-{-evalMotion :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> State TotalState
-evalMotion x y z r
+runModel :: Model a -> (Either String a, TotalState)
+runModel model = runState (runExceptT model) initialState
 
-evalStatement :: Parser.Statement -> State TotalState
-evalStatement (Parser.ST_MOVE x y z r stm) = do
-    evalMotion x y z r
--}
+initialHeadState :: HeadState
+initialHeadState = HEADSTATE (LOC (VECTOR 0 0 0) 0) (ORIENT (VECTOR 1 0 0) (VECTOR 0 1 0) (VECTOR 0 0 1)) DRAW
+
+initialState :: TotalState
+initialState = TOTAL (FIXED Map.empty) (EPHEMERAL [Map.empty]) (PERSIST initialHeadState [] [])
 
 getHeadState :: Model HeadState
 getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) ->  (h,(TOTAL f e (PERSIST h stk records)))

@@ -1,4 +1,4 @@
-module Parser(Program (PROGRAM), Definition (DEFINE), Statement, Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
+module Parser(Program (PROGRAM), Definition (DEFINE), Statement(ST_MOVE, ST_STACKMANIP, ST_EMPTY, ST_APPLY, ST_COND, ST_ROTATEX, ST_ROTATEY, ST_ROTATEZ), Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
