@@ -6,7 +6,8 @@ import Control.Monad.Except
 import qualified Data.List as List
 
 executeProgram :: Parser.Program -> Model ()
-executeProgram (Parser.PROGRAM definitions statement) = (addDefinitions definitions) >> (executeStatement statement)
+executeProgram (Parser.PROGRAM definitions statement) =
+        (addDefinitions definitions) >> (executeStatement statement)
 
 executeStatement :: Parser.Statement -> Model ()
 executeStatement statement = case statement of
@@ -18,10 +19,22 @@ executeStatement statement = case statement of
     (Parser.ST_ROTATEX expr st)             -> executeRotateX expr st
     (Parser.ST_ROTATEY expr st)             -> executeRotateY expr st
     (Parser.ST_ROTATEZ expr st)             -> executeRotateZ expr st
-    (Parser.ST_ERASE st)                       -> setErase >> (executeStatement st)
-    (Parser.ST_FREEMOVE st)                    -> setMove >> (executeStatement st)
-    (Parser.ST_DRAW st)                        -> setDraw >> (executeStatement st)
+    (Parser.ST_ERASE st)                    -> setErase >> (executeStatement st)
+    (Parser.ST_FREEMOVE st)                 -> setMove >> (executeStatement st)
+    (Parser.ST_DRAW st)                     -> setDraw >> (executeStatement st)
 
+executeMove :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
+executeMove xExpr yExpr zExpr rExpr statement = do
+    poses <- generatePositions xExpr yExpr zExpr rExpr
+    moveDiscretised poses
+    executeStatement statement
+
+executeStackManip :: Parser.Statement -> Parser.Statement -> Model ()
+executeStackManip statement rest = do
+    pushHeadToStack
+    executeStatement statement
+    popHeadFromStack
+    executeStatement rest
 
 executeCond :: Parser.Expr -> Parser.Statement -> Parser.Statement -> Parser.Statement -> Model ()
 executeCond expr branch1 branch2 rest = do
@@ -34,13 +47,6 @@ executeCond expr branch1 branch2 rest = do
 executeEmpty :: Model ()
 executeEmpty = do
     return ()
-
-executeStackManip :: Parser.Statement -> Parser.Statement -> Model ()
-executeStackManip statement rest = do
-    pushHeadToStack
-    executeStatement statement
-    popHeadFromStack
-    executeStatement rest
 
 executeApply :: Parser.Identifier -> [Parser.Param] -> Parser.Statement -> Model ()
 executeApply funcName funcArgs rest = do
@@ -73,13 +79,6 @@ executeRotateZ expr statement = do
     theta <- evalInternal expr
     rotateZ theta
     executeStatement statement
-
-executeMove :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
-executeMove xExpr yExpr zExpr rExpr statement = do
-    poses <- generatePositions xExpr yExpr zExpr rExpr
-    moveDiscretised poses
-    executeStatement statement
-
 
 loadParam :: Map.Map Parser.Identifier Float -> Parser.Param -> Maybe Float
 loadParam bindings (PARAM_NUM num) = Just num
