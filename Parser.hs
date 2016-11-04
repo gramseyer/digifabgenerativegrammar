@@ -1,4 +1,4 @@
-module Parser(Program (PROGRAM), Definition (DEFINE), Statement(ST_MOVE, ST_STACKMANIP, ST_EMPTY, ST_APPLY, ST_COND, ST_ROTATEX, ST_ROTATEY, ST_ROTATEZ), Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
+module Parser(Program (PROGRAM), Definition (DEFINE), Statement(ST_MOVE, ST_STACKMANIP, ST_EMPTY, ST_APPLY, ST_COND, ST_ROTATEX, ST_ROTATEY, ST_ROTATEZ, ST_ERASE, ST_DRAW, ST_FREEMOVE), Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
@@ -17,6 +17,9 @@ data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_ROTATEX Expr Statement
                 | ST_ROTATEY Expr Statement
                 | ST_ROTATEZ Expr Statement
+                | ST_ERASE Statement
+                | ST_DRAW Statement
+                | ST_FREEMOVE Statement
                 deriving Show
 
 data Param = PARAM_ID Identifier
@@ -87,7 +90,17 @@ paramNum = do
     return $ PARAM_NUM test
 
 statement :: Parser Statement 
-statement = try stMove <|> try stStack <|> try stCond <|> try stApply <|> try stRotateX <|> try stRotateY <|> try stRotateZ <|> stEmpty
+statement = try stMove 
+        <|> try stStack
+        <|> try stCond
+        <|> try stApply
+        <|> try stRotateX
+        <|> try stRotateY
+        <|> try stRotateZ
+        <|> try stDraw
+        <|> try stErase
+        <|> try stFreeMove
+        <|> stEmpty
 
 stMove :: Parser Statement
 stMove = do
@@ -179,6 +192,33 @@ stRotateZ = do
     whiteSpace
     remain <- statement
     return $ ST_ROTATEZ rot remain
+
+stDraw :: Parser Statement
+stDraw = do
+    string "DRAW"
+    whiteSpace
+    char ';'
+    whiteSpace
+    remain <- statement
+    return $ ST_DRAW remain
+
+stErase :: Parser Statement
+stErase = do
+    string "ERASE"
+    whiteSpace
+    char ';'
+    whiteSpace
+    remain <- statement
+    return $ ST_ERASE remain
+
+stFreeMove :: Parser Statement
+stFreeMove = do
+    string "FREEMOVE"
+    whiteSpace
+    char ';'
+    whiteSpace
+    remain <- statement
+    return $ ST_FREEMOVE remain
 
 stEmpty :: Parser Statement
 stEmpty = return ST_EMPTY

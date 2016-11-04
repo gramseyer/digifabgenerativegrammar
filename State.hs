@@ -1,4 +1,4 @@
-module State (Model, runModel, rotateX, rotateY, rotateZ, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State (Model, runModel, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -12,17 +12,19 @@ data Action = DRAW | ERASE | MOVE
 -- There might be better libraries for these
 data Orientation = ORIENT Vector Vector Vector
 
-data Vector = VECTOR Float Float Float deriving Show
+type Vector = (Float, Float, Float) --Must be only ever length 3
 
-data Position = LOC Vector Float -- x,y,z radius
+type Position = (Vector, Float) -- x,y,z radius
 
 -- State that persists through control flow
-data PersistState = PERSIST HeadState [HeadState] [RecordedAction]
+data PersistState = PERSIST HeadState [HeadState] Recording
 
 --Record of motion of the head through space.  
 --Action, along with the discretized list of positions of the head
 --as the motion was recorded.
-data RecordedAction = RECORDED Action [Position]
+type Recording = ([Position], [RecordedActions])
+
+data RecordedActions = RECORDED Action [Position]
 
 -- State that is fixed at the start of evaluation, like function definitions
 data FixedState = FIXED (Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement))
@@ -39,10 +41,10 @@ runModel :: Model a -> (Either String a, TotalState)
 runModel model = runState (runExceptT model) initialState
 
 initialHeadState :: HeadState
-initialHeadState = HEADSTATE (LOC (VECTOR 0 0 0) 0) (ORIENT (VECTOR 1 0 0) (VECTOR 0 1 0) (VECTOR 0 0 1)) DRAW
+initialHeadState = HEADSTATE ((0,0,0), 0) (ORIENT (1,0,0) (0,1,0) (0,0,1)) DRAW
 
 initialState :: TotalState
-initialState = TOTAL (FIXED Map.empty) (EPHEMERAL [Map.empty]) (PERSIST initialHeadState [] [])
+initialState = TOTAL (FIXED Map.empty) (EPHEMERAL [Map.empty]) (PERSIST initialHeadState [] ([],[]))
 
 getHeadState :: Model HeadState
 getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) ->  (h,(TOTAL f e (PERSIST h stk records)))
@@ -87,14 +89,17 @@ unpackDefn _ (Just result) = do
     return result
 
 makeVector :: [Float] -> Vector
-makeVector (x:y:z:[]) = VECTOR x y z
+makeVector (x:y:z:[]) = (x,y,z)
 makeVector _ = error "invalid vector length"
 
+makeList :: Vector -> [Float]
+makeList (x,y,z) = [x,y,z]
+
 rotateVectorByVector :: Float -> Vector -> Vector -> Vector
-rotateVectorByVector theta vOfRot (VECTOR vx vy vz) = makeVector $ List.map (List.foldr (+) 0) (List.map (List.zipWith (*) [vx, vy, vz]) (getRotationMatrix vOfRot theta))
+rotateVectorByVector theta vOfRot (vx, vy, vz) = makeVector $ List.map (List.foldr (+) 0) (List.map (List.zipWith (*) [vx, vy, vz]) (getRotationMatrix vOfRot theta))
 
 getRotationMatrix :: Vector -> Float -> [[Float]]
-getRotationMatrix (VECTOR vx vy vz) theta =
+getRotationMatrix (vx,vy,vz) theta =
     [[c+vx*vx*(1-c),     vx*vy*(1-c)-vz*s, vx*vz*(1-c)+vy*s],
      [vx*vy*(1-c)+vz*s,  c+vy*vy*(1-c),    vy*vz*(1-c)-vx*s],
      [vx*vz*(1-c)-vy*s,  vy*vz*(1-c)+vx*s, c+vz*vz*(1-c)   ]] 
@@ -118,7 +123,6 @@ rotateZ theta = do
     (ORIENT vx vy vz) <- getOrientation
     rotate vz theta
 
-
 rotate :: Vector -> Float -> Model ()
 rotate v theta = do
     (ORIENT vx vy vz) <- getOrientation
@@ -126,10 +130,55 @@ rotate v theta = do
     where
         rotateFunc = rotateVectorByVector theta v
 
-
 getOrientation :: Model Orientation
 getOrientation = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)) ->  (o,(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)))   
 
 putOrientation :: Orientation -> Model ()
 putOrientation orientation = state $ \(TOTAL f e (PERSIST (HEADSTATE p _ a) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p orientation a) stk records)))   
 
+adjustForOrientation :: Orientation -> Vector -> Vector
+adjustForOrientation (ORIENT vx vy vz) v = makeVector $
+    List.foldr (List.zipWith (+)) [0,0,0] $
+        List.zipWith (\k->List.map ((*)k)) (makeList v)  [makeList vx, makeList vy, makeList vz]
+
+addV :: Vector -> Vector -> Vector
+addV (vx, vy, vz) (vx', vy', vz') = (vx+vx', vy+vy', vz+vz')
+
+addPoses :: Position -> Position -> Position
+addPoses (v, r) (v', r') = ((addV v v'), (r+r'))
+
+logPos :: Position-> Model ()
+logPos (v, r) = do
+    (HEADSTATE base o _) <- getHeadState
+    pushLogToStk $ addPoses base ((adjustForOrientation o v), r)
+
+pushLogToStk :: Position -> Model ()
+pushLogToStk newPos = state $ \(TOTAL f e (PERSIST h stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST h stk (newPos: recording, recorded))))   
+
+endLogPosSet :: Model ()
+endLogPosSet = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o a) stk ([], (RECORDED a recording):recorded))))   
+
+setPos :: Position -> Model ()
+setPos pos = state $ \(TOTAL f e (PERSIST (HEADSTATE _ o a) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE pos o a) stk records)))   
+
+moveDiscretised :: [Position] -> Model ()
+moveDiscretised poses = do
+    mergedPositions
+    endLogPosSet
+    (HEADSTATE curPos _ _) <- getHeadState
+    setPos (addPoses curPos (List.last poses))
+    where
+        posModels = List.map logPos poses
+        mergedPositions = List.foldr (>>) (List.head posModels) (List.tail posModels)
+
+setAction :: Action -> Model ()
+setAction action = state $ \(TOTAL f e (PERSIST (HEADSTATE p o _) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o action) stk records)))
+
+setDraw :: Model ()
+setDraw = setAction DRAW
+
+setErase :: Model ()
+setErase = setAction ERASE
+
+setMove :: Model ()
+setMove = setAction MOVE

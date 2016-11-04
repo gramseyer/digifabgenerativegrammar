@@ -9,7 +9,19 @@ executeProgram :: Parser.Program -> Model ()
 executeProgram (Parser.PROGRAM definitions statement) = (addDefinitions definitions) >> (executeStatement statement)
 
 executeStatement :: Parser.Statement -> Model ()
-executeStatement statement = throwError "Unimplemented"
+executeStatement statement = case statement of
+    (Parser.ST_MOVE x y z r st)             -> executeMove x y z r st
+    (Parser.ST_STACKMANIP st st')           -> executeStackManip st st'
+    (Parser.ST_EMPTY)                       -> executeEmpty 
+    (Parser.ST_APPLY identifier params st)  -> executeApply identifier params st
+    (Parser.ST_COND expr st1 st2 st')       -> executeCond expr st1 st2 st'
+    (Parser.ST_ROTATEX expr st)             -> executeRotateX expr st
+    (Parser.ST_ROTATEY expr st)             -> executeRotateY expr st
+    (Parser.ST_ROTATEZ expr st)             -> executeRotateZ expr st
+    (Parser.ST_ERASE st)                       -> setErase >> (executeStatement st)
+    (Parser.ST_FREEMOVE st)                    -> setMove >> (executeStatement st)
+    (Parser.ST_DRAW st)                        -> setDraw >> (executeStatement st)
+
 
 executeCond :: Parser.Expr -> Parser.Statement -> Parser.Statement -> Parser.Statement -> Model ()
 executeCond expr branch1 branch2 rest = do
@@ -19,8 +31,8 @@ executeCond expr branch1 branch2 rest = do
         else executeStatement branch2
     executeStatement rest
 
-executeEmpty :: Parser.Statement -> Model ()
-executeEmpty statement = do
+executeEmpty :: Model ()
+executeEmpty = do
     return ()
 
 executeStackManip :: Parser.Statement -> Parser.Statement -> Model ()
@@ -62,6 +74,13 @@ executeRotateZ expr statement = do
     rotateZ theta
     executeStatement statement
 
+executeMove :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
+executeMove xExpr yExpr zExpr rExpr statement = do
+    poses <- generatePositions xExpr yExpr zExpr rExpr
+    moveDiscretised poses
+    executeStatement statement
+
+
 loadParam :: Map.Map Parser.Identifier Float -> Parser.Param -> Maybe Float
 loadParam bindings (PARAM_NUM num) = Just num
 loadParam bindings (PARAM_ID identifier) = Map.lookup identifier bindings
@@ -74,9 +93,41 @@ validateParams _ [] [] = do
     return ()
 validateParams funcName _ _ = throwError $ "mismatched number of args for function " ++ funcName
 
+consAccumulate :: Model x -> Model [x] -> Model [x]
+consAccumulate model model' = do
+    x <- model
+    xs <- model'
+    return $ x:xs
+
+baseAccumulate :: Model [x]
+baseAccumulate = do
+    return []
+
+generatePositions :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Model [((Float, Float, Float), Float)]
+generatePositions x y z r = List.foldr consAccumulate (baseAccumulate) (mergedPositions)
+    where
+        positions = List.zip4 (evalTimeExprLifted x timeRange)
+                              (evalTimeExprLifted y timeRange)
+                              (evalTimeExprLifted z timeRange)
+                              (evalTimeExprLifted r timeRange)
+        mergedPositions = List.map mergeModels positions
+
+
+mergeModels (xM, yM, zM, rM) = do
+    x<-xM
+    y<-yM
+    z<-zM
+    r<-rM
+    return ((x,y,z),r)
+
+timeRange :: [Float]
+timeRange = [0,0.05..1]
 
 timeVar :: Parser.Identifier
 timeVar = "t"
+
+evalTimeExprLifted :: Parser.Expr -> [Float] -> [Model Float]
+evalTimeExprLifted expr = liftM (evalTimeExpr expr)
 
 evalTimeExpr :: Parser.Expr -> Float -> Model Float
 evalTimeExpr expr time = do
