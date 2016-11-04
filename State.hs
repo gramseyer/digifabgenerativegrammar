@@ -1,4 +1,4 @@
-module State (Model, runModel, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State (Model, runModel, rotateX, rotateY, rotateZ, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -12,7 +12,7 @@ data Action = DRAW | ERASE | MOVE
 -- There might be better libraries for these
 data Orientation = ORIENT Vector Vector Vector
 
-data Vector = VECTOR Float Float Float
+data Vector = VECTOR Float Float Float deriving Show
 
 data Position = LOC Vector Float -- x,y,z radius
 
@@ -85,4 +85,51 @@ unpackDefn :: Parser.Identifier -> Maybe ([Parser.Identifier], Parser.Statement)
 unpackDefn var Nothing = throwError ("Function " ++ var ++ " is not defined")
 unpackDefn _ (Just result) = do
     return result
+
+makeVector :: [Float] -> Vector
+makeVector (x:y:z:[]) = VECTOR x y z
+makeVector _ = error "invalid vector length"
+
+rotateVectorByVector :: Float -> Vector -> Vector -> Vector
+rotateVectorByVector theta vOfRot (VECTOR vx vy vz) = makeVector $ List.map (List.foldr (+) 0) (List.map (List.zipWith (*) [vx, vy, vz]) (getRotationMatrix vOfRot theta))
+
+getRotationMatrix :: Vector -> Float -> [[Float]]
+getRotationMatrix (VECTOR vx vy vz) theta =
+    [[c+vx*vx*(1-c),     vx*vy*(1-c)-vz*s, vx*vz*(1-c)+vy*s],
+     [vx*vy*(1-c)+vz*s,  c+vy*vy*(1-c),    vy*vz*(1-c)-vx*s],
+     [vx*vz*(1-c)-vy*s,  vy*vz*(1-c)+vx*s, c+vz*vz*(1-c)   ]] 
+     where
+        radTheta = (theta*pi)/180
+        c = cos radTheta
+        s = sin radTheta
+
+rotateX :: Float -> Model ()
+rotateX theta = do
+    (ORIENT vx vy vz) <- getOrientation
+    rotate vx theta
+
+rotateY :: Float -> Model ()
+rotateY theta = do
+    (ORIENT vx vy vz) <- getOrientation
+    rotate vy theta
+
+rotateZ :: Float -> Model ()
+rotateZ theta = do
+    (ORIENT vx vy vz) <- getOrientation
+    rotate vz theta
+
+
+rotate :: Vector -> Float -> Model ()
+rotate v theta = do
+    (ORIENT vx vy vz) <- getOrientation
+    putOrientation (ORIENT (rotateFunc vx) (rotateFunc vy) (rotateFunc vz))
+    where
+        rotateFunc = rotateVectorByVector theta v
+
+
+getOrientation :: Model Orientation
+getOrientation = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)) ->  (o,(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)))   
+
+putOrientation :: Orientation -> Model ()
+putOrientation orientation = state $ \(TOTAL f e (PERSIST (HEADSTATE p _ a) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p orientation a) stk records)))   
 

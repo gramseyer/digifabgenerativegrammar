@@ -44,6 +44,24 @@ executeApply funcName funcArgs rest = do
         unJust (Just x) = x
         unJust Nothing = error "This should have been checked earlier"
 
+executeRotateX :: Parser.Expr -> Parser.Statement -> Model ()
+executeRotateX expr statement = do
+    theta <- evalInternal expr
+    rotateX theta
+    executeStatement statement
+
+executeRotateY :: Parser.Expr -> Parser.Statement -> Model ()
+executeRotateY expr statement = do
+    theta <- evalInternal expr
+    rotateY theta
+    executeStatement statement
+
+executeRotateZ :: Parser.Expr -> Parser.Statement -> Model ()
+executeRotateZ expr statement = do
+    theta <- evalInternal expr
+    rotateZ theta
+    executeStatement statement
+
 loadParam :: Map.Map Parser.Identifier Float -> Parser.Param -> Maybe Float
 loadParam bindings (PARAM_NUM num) = Just num
 loadParam bindings (PARAM_ID identifier) = Map.lookup identifier bindings
