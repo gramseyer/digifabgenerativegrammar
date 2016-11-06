@@ -12,7 +12,7 @@ data Action = DRAW | ERASE | MOVE deriving (Show, Eq)
 -- There might be better libraries for these
 data Orientation = ORIENT Vector Vector Vector
 
-type Vector = (Float, Float, Float) --Must be only ever length 3
+type Vector = (Float, Float, Float)
 
 type Position = (Vector, Float)-- x,y,z radius
 

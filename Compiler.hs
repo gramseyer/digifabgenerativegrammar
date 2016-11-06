@@ -14,10 +14,10 @@ run str = OpenSCAD.getOpenSCADStr $
 
 processArgs :: [String] -> IO (String)
 processArgs (name:[]) = do
-    putStrLn $ "Compiling file " ++ name
+    putStrLn $ "Compiling file \"" ++ name ++"\""
     return $ name
 processArgs _ = do
-    putStrLn "Usage: <call> <name>"
+    putStrLn "Usage: ./Compiler <filename>"
     error "invalid usage"
 
 loadFile :: String -> IO (String, String)
