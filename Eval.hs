@@ -102,7 +102,7 @@ baseAccumulate :: Model [x]
 baseAccumulate = do
     return []
 
-generatePositions :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Model [((Float, Float, Float), Float)]
+generatePositions :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Model [State.Position]
 generatePositions x y z r = List.foldr consAccumulate (baseAccumulate) (mergedPositions)
     where
         positions = List.zip4 (evalTimeExprLifted x timeRange)
@@ -111,7 +111,7 @@ generatePositions x y z r = List.foldr consAccumulate (baseAccumulate) (mergedPo
                               (evalTimeExprLifted r timeRange)
         mergedPositions = List.map mergeModels positions
 
-
+mergeModels :: (Model Float, Model Float, Model Float, Model Float) -> Model State.Position
 mergeModels (xM, yM, zM, rM) = do
     x<-xM
     y<-yM

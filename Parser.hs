@@ -45,8 +45,10 @@ showBinop e1 e2 = "(" ++ (show e1) ++ ") (" ++ (show e2) ++")"
 
 type Identifier = String
 
-parseProgram :: String -> Either ParseError Program
-parseProgram = parse program "Invalid Parse"
+parseProgram :: String -> Program
+parseProgram str = case parse program "Invalid Parse" str of
+    Left z -> error (show z) 
+    Right x -> x
 
 program :: Parser Program
 program = do
@@ -107,9 +109,13 @@ stMove = do
     string "MOVE"
     whiteSpace
     x <- topExpr
+    whiteSpace
     y <- topExpr
+    whiteSpace
     z <- topExpr
+    whiteSpace
     r <- topExpr
+    whiteSpace
     char ';'
     whiteSpace
     remain <- statement

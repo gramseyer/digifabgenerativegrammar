@@ -1,4 +1,4 @@
-module State (Model, runModel, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State (Model, RecordedActions, Action (DRAW, MOVE, ERASE), Vector, Position, evalModel,getRecords, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -7,14 +7,14 @@ import qualified Data.List as List
 
 data HeadState = HEADSTATE Position Orientation Action
 
-data Action = DRAW | ERASE | MOVE
+data Action = DRAW | ERASE | MOVE deriving Show
 
 -- There might be better libraries for these
 data Orientation = ORIENT Vector Vector Vector
 
 type Vector = (Float, Float, Float) --Must be only ever length 3
 
-type Position = (Vector, Float) -- x,y,z radius
+type Position = (Vector, Float)-- x,y,z radius
 
 -- State that persists through control flow
 data PersistState = PERSIST HeadState [HeadState] Recording
@@ -22,9 +22,9 @@ data PersistState = PERSIST HeadState [HeadState] Recording
 --Record of motion of the head through space.  
 --Action, along with the discretized list of positions of the head
 --as the motion was recorded.
-type Recording = ([Position], [RecordedActions])
+type Recording = ([Position], [RecordedActions]) 
 
-data RecordedActions = RECORDED Action [Position]
+type RecordedActions = (Action, [Position])
 
 -- State that is fixed at the start of evaluation, like function definitions
 data FixedState = FIXED (Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement))
@@ -36,6 +36,11 @@ data EphemeralState = EPHEMERAL [Map.Map Parser.Identifier Float]
 data TotalState = TOTAL FixedState EphemeralState PersistState
 
 type Model a = ExceptT String (State TotalState) a --StateT s (Either String) TotalState
+
+evalModel :: Model a -> a
+evalModel model = case fst.runModel $ model of
+    Left errorMsg -> error errorMsg
+    Right x -> x
 
 runModel :: Model a -> (Either String a, TotalState)
 runModel model = runState (runExceptT model) initialState
@@ -156,7 +161,7 @@ pushLogToStk :: Position -> Model ()
 pushLogToStk newPos = state $ \(TOTAL f e (PERSIST h stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST h stk (newPos: recording, recorded))))   
 
 endLogPosSet :: Model ()
-endLogPosSet = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o a) stk ([], (RECORDED a recording):recorded))))   
+endLogPosSet = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o a) stk ([], (a, recording):recorded))))   
 
 setPos :: Position -> Model ()
 setPos pos = state $ \(TOTAL f e (PERSIST (HEADSTATE _ o a) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE pos o a) stk records)))   
@@ -169,7 +174,7 @@ moveDiscretised poses = do
     setPos (addPoses curPos (List.last poses))
     where
         posModels = List.map logPos poses
-        mergedPositions = List.foldr (>>) (List.head posModels) (List.tail posModels)
+        mergedPositions = List.foldr1 (>>) (posModels)
 
 setAction :: Action -> Model ()
 setAction action = state $ \(TOTAL f e (PERSIST (HEADSTATE p o _) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o action) stk records)))
@@ -182,3 +187,6 @@ setErase = setAction ERASE
 
 setMove :: Model ()
 setMove = setAction MOVE
+
+getRecords :: Model [RecordedActions]
+getRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (records ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))))  
