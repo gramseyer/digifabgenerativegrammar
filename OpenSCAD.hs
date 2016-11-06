@@ -15,6 +15,7 @@ generateOpenSCAD ((State.MOVE, positions) : xs) = do
 generateOpenSCAD ((action, positions) : xs) = do
     writeAction action
     indentUp
+    generateOpenSCAD xs
     generateMotion positions
     indentDown
     putLine $ "}"
@@ -23,8 +24,8 @@ generateOpenSCAD [] = do
 
 writeAction :: State.Action -> Writer ()
 writeAction action = case action of
-    State.DRAW -> putLine $ "union {"
-    State.ERASE -> putLine $ "intersection"
+    State.DRAW -> putLine $ "union () {"
+    State.ERASE -> putLine $ "intersection () {"
     _ -> error "move in action"
 
 indentUp :: Writer ()
@@ -45,7 +46,13 @@ putLine str = do
     put (indent, (prev ++ indent ++ str ++ "\n"))
 
 generateMotion :: [State.Position] -> Writer ()
-generateMotion positions = List.foldr1 (>>) (List.map (generateJoint) (List.zip positions (List.tail positions)))
+generateMotion positions = List.foldr1 (>>) $
+    List.map (generateJoint) $
+        List.filter filterRenderableObjects $
+            List.zip positions (List.tail positions)
+
+filterRenderableObjects :: (State.Position, State.Position) -> Bool
+filterRenderableObjects ((v1, r1), (v2, r2)) = (r1>0.01 && r2>0.01)
 
 generateJoint :: (State.Position, State.Position) -> Writer ()
 generateJoint (p1, p2) = do
@@ -60,6 +67,6 @@ generateSphere :: State.Position -> Writer ()
 generateSphere ((x, y, z), r) = do
     putLine $ "translate(["++(show x)++","++(show y)++","++(show z)++"]) {"
     indentUp
-    putLine $ "sphere(radius = " ++ (show r) ++ ");"
+    putLine $ "sphere(r = " ++ (show r) ++ ");"
     indentDown
     putLine $ "}"

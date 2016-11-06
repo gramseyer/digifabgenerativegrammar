@@ -48,13 +48,24 @@ executeEmpty :: Model ()
 executeEmpty = do
     return ()
 
-executeApply :: Parser.Identifier -> [Parser.Param] -> Parser.Statement -> Model ()
+makeParamBindings :: [Parser.Expr] -> [Parser.Identifier] -> Model ([(Parser.Identifier, Float)])
+makeParamBindings (expr : exprs) (iden : idens) = do
+    evaluated <- evalInternal expr
+    rest <- makeParamBindings exprs idens
+    return $ (iden, evaluated) : rest
+makeParamBindings [] [] = do
+    return []
+makeParamBindings _ _ = error "Non matching number of arguments/parameters."
+
+executeApply :: Parser.Identifier -> [Parser.Expr] -> Parser.Statement -> Model ()
 executeApply funcName funcArgs rest = do
     bindings <- getVarBindings
     (argNames, statement) <- findDefinition funcName
-    let params = List.map (loadParam bindings) funcArgs
-    validateParams funcName argNames params
-    pushVarBindings (List.zip argNames (List.map unJust params))
+    bindings <- makeParamBindings funcArgs argNames
+    pushVarBindings bindings
+    --let params = List.map (loadParam bindings) funcArgs
+    --validateParams funcName argNames params
+    --pushVarBindings (List.zip argNames (List.map unJust params))
     executeStatement statement
     popVarBindings
     executeStatement rest

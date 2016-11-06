@@ -12,7 +12,7 @@ data Definition = DEFINE Identifier [Identifier] Statement
 data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_STACKMANIP Statement Statement
                 | ST_EMPTY
-                | ST_APPLY Identifier [Param] Statement
+                | ST_APPLY Identifier [Expr] Statement
                 | ST_COND Expr Statement Statement Statement
                 | ST_ROTATEX Expr Statement
                 | ST_ROTATEY Expr Statement
@@ -158,7 +158,7 @@ stApply = do
     whiteSpace
     iden <- identifier
     whiteSpace
-    params <- many param 
+    params <- many topExpr 
     char '}'
     whiteSpace
     char ';'
@@ -309,8 +309,9 @@ floatParse = do
 
 intParse :: Parser Float
 intParse = do
+    firstDigit <- digit
     temp <- many digit
-    return $ read temp
+    return $ read (firstDigit : temp)
 
 numParse :: Parser Float
 numParse = try floatParse <|> intParse

@@ -1,0 +1,6 @@
+(DEFINE func (n) IF (n)
+			THEN [MOVE (3*t*n) (0) (0) (t);];ROTATEZ (60);{func (n-1)}; 
+			ELSE 
+		;
+)
+{func (11.1)};

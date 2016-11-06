@@ -170,11 +170,12 @@ moveDiscretised :: [Position] -> Model ()
 moveDiscretised poses = do
     mergedPositions
     endLogPosSet
-    (HEADSTATE curPos _ _) <- getHeadState
-    setPos (addPoses curPos (List.last poses))
+    (HEADSTATE curPos o _) <- getHeadState
+    setPos (addPoses curPos (adjustForOrientation o lastPos, r))
     where
         posModels = List.map logPos poses
         mergedPositions = List.foldr1 (>>) (posModels)
+        (lastPos, r) = List.last poses
 
 setAction :: Action -> Model ()
 setAction action = state $ \(TOTAL f e (PERSIST (HEADSTATE p o _) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o action) stk records)))

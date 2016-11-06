@@ -1,0 +1,1 @@
+(DEFINE func (x) MOVE (10*t) (0) (0) (t);){func (1)}; ROTATEZ (30); {func (2)}; ROTATEZ (~30); {func (3)};
