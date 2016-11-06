@@ -7,9 +7,10 @@ import qualified Data.List as List
 type Writer a = State (String, String) a
 
 getOpenSCADStr :: [State.RecordedActions] -> String
-getOpenSCADStr positions = snd $ evalState ((generateOpenSCAD positions) >> get) ("", "")
+getOpenSCADStr positions = snd $ 
+    evalState (((generateOpenSCAD.mergeRecords) positions) >> get) ("", "")
 
-generateOpenSCAD :: [State.RecordedActions] -> Writer () -- output code could be simplified by merging adjacent unions/intersections
+generateOpenSCAD :: [State.RecordedActions] -> Writer ()
 generateOpenSCAD ((State.MOVE, positions) : xs) = do
     generateOpenSCAD xs
 generateOpenSCAD ((action, positions) : xs) = do
@@ -21,6 +22,15 @@ generateOpenSCAD ((action, positions) : xs) = do
     putLine $ "}"
 generateOpenSCAD [] = do
     return ()
+
+mergeRecords :: [State.RecordedActions] -> [State.RecordedActions]
+mergeRecords ((MOVE, _) : actions) = mergeRecords actions
+mergeRecords ((x, x') : (y, y') : rest) = 
+    if x==y 
+        then mergeRecords $ (x, x'++y'):rest
+        else (x,x') : (mergeRecords $ (y,y'):rest)
+mergeRecords [x] = [x]
+mergeRecords [] = []
 
 writeAction :: State.Action -> Writer ()
 writeAction action = case action of

@@ -7,7 +7,7 @@ import qualified Data.List as List
 
 data HeadState = HEADSTATE Position Orientation Action
 
-data Action = DRAW | ERASE | MOVE deriving Show
+data Action = DRAW | ERASE | MOVE deriving (Show, Eq)
 
 -- There might be better libraries for these
 data Orientation = ORIENT Vector Vector Vector

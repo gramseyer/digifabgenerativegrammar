@@ -63,9 +63,6 @@ executeApply funcName funcArgs rest = do
     (argNames, statement) <- findDefinition funcName
     bindings <- makeParamBindings funcArgs argNames
     pushVarBindings bindings
-    --let params = List.map (loadParam bindings) funcArgs
-    --validateParams funcName argNames params
-    --pushVarBindings (List.zip argNames (List.map unJust params))
     executeStatement statement
     popVarBindings
     executeStatement rest
