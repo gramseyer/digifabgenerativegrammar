@@ -331,7 +331,6 @@ whiteSpace = do
     many (satisfy isWhiteSpace)
     return ()
     
-
 isWhiteSpace :: Char -> Bool
 isWhiteSpace ' ' = True
 isWhiteSpace '\n' = True
