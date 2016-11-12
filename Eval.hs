@@ -30,10 +30,14 @@ executePerturb p remain =  case p of
     (Parser.P_HOLLOW draw erase st) -> executeHollow draw erase st 
 
 executeHollow :: Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
-executeHollow draw erase st = runSubmodel id $ executeStatement st
+executeHollow draw erase st = runSubmodel $ executeStatement st
 
 executeInvert :: Parser.Statement -> Model ()
-executeInvert st = runSubmodel invertRecords $ executeStatement st 
+executeInvert st = runSubmodel ((executeStatement st)>> 
+    (do
+        records <- getRecords
+        clearRecords
+        addRecords $ invertRecords records))
 
 invertRecords :: [RecordedActions] -> [RecordedActions]
 invertRecords = List.map invert

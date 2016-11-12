@@ -1,4 +1,4 @@
-module State (Model, RecordedActions, Action (DRAW, MOVE, ERASE), Vector, Position, evalModel,getRecords, runSubmodel, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State (Model, RecordedActions, Action (DRAW, MOVE, ERASE), Vector, Position, evalModel,getRecords, addRecords, clearRecords, runSubmodel, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -42,10 +42,10 @@ evalModel model = case fst.runModel $ model of
     Left errorMsg -> error errorMsg
     Right x -> x
 
-runSubmodel :: ([RecordedActions] -> [RecordedActions]) -> Model () -> Model ()
-runSubmodel transformFunc submodel = do
+runSubmodel :: Model () -> Model ()
+runSubmodel submodel = do
     headState <- getHeadState
-    addRecords $ transformFunc (evalModelOnState submodel headState)
+    addRecords $ (evalModelOnState submodel headState)
 
 evalModelOnState :: Model () -> HeadState -> [RecordedActions]
 evalModelOnState model headState = case 
@@ -206,6 +206,9 @@ setMove = setAction MOVE
 
 getRecords :: Model [RecordedActions]
 getRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (records ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))))  
+
+clearRecords :: Model ()
+clearRecords = state $ \(TOTAL f e (PERSIST h stk _)) ->  (() ,(TOTAL f e (PERSIST h stk ([], []))))
 
 addRecords :: [RecordedActions] -> Model ()
 addRecords newRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (() ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, newRecords ++ records))))  
