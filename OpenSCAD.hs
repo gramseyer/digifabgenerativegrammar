@@ -21,7 +21,8 @@ generateOpenSCAD ((action, positions) : xs) = do
     indentDown
     putLine $ "}"
 generateOpenSCAD [] = do
-    return ()
+    writeAction State.DRAW
+    putLine $ "}"
 
 mergeRecords :: [State.RecordedActions] -> [State.RecordedActions]
 mergeRecords ((MOVE, _) : actions) = mergeRecords actions
