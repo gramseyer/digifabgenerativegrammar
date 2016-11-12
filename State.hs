@@ -35,7 +35,7 @@ data EphemeralState = EPHEMERAL [Map.Map Parser.Identifier Float]
 
 data TotalState = TOTAL FixedState EphemeralState PersistState
 
-type Model a = ExceptT String (State TotalState) a --StateT s (Either String) TotalState
+type Model a = ExceptT String (State TotalState) a
 
 evalModel :: Model a -> a
 evalModel model = case fst.runModel $ model of
