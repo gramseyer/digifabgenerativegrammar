@@ -30,7 +30,23 @@ executePerturb p remain =  case p of
     (Parser.P_HOLLOW draw erase st) -> executeHollow draw erase st 
 
 executeHollow :: Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
-executeHollow draw erase st = runSubmodel $ executeStatement st
+executeHollow draw erase st = runSubmodel ((executeStatement st) >>
+   (do
+       records <- getRecords
+       clearRecords  
+       addRecords $ hollowRecords records draw erase))
+
+hollowRecords :: [RecordedActions] -> Parser.Expr -> Parser.Expr -> [RecordedActions]
+hollowRecords records draw erase = concat $ List.map (\action -> hollow action draw erase) records
+
+hollow :: RecordedActions -> Parser.Expr -> Parser.Expr -> [RecordedActions]
+hollow (DRAW, pos) d _ = [(DRAW, pos), (ERASE, hollowOut d pos)]
+hollow (ERASE, pos) _ e =  [(ERASE, pos), (DRAW, hollowOut e pos)]
+hollow (MOVE, pos) _ _ = [(MOVE, pos)]
+
+
+hollowOut :: Parser.Expr -> [Position] -> [Position]
+hollowOut (EXP_NUM draw) positions = List.map (\(vect, radius) -> (vect, radius-draw)) positions
 
 executeInvert :: Parser.Statement -> Model ()
 executeInvert st = runSubmodel ((executeStatement st)>> 
