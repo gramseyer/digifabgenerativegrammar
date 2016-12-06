@@ -1,0 +1,2 @@
+INVERT DRAW; MOVE (40*t) (8*t*t) (12*t*t*t*t) (3*t);;
+

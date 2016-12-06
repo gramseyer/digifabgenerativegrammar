@@ -22,6 +22,46 @@ executeStatement statement = case statement of
     (Parser.ST_ERASE st)                    -> setErase >> (executeStatement st)
     (Parser.ST_FREEMOVE st)                 -> setMove >> (executeStatement st)
     (Parser.ST_DRAW st)                     -> setDraw >> (executeStatement st)
+    (Parser.ST_PERTURB p st)                -> executePerturb p st
+
+executePerturb :: Parser.Perturbation -> Parser.Statement -> Model ()
+executePerturb p remain =  case p of
+    (Parser.P_INVERT st)            -> executeInvert st
+    (Parser.P_HOLLOW draw erase st) -> executeHollow draw erase st 
+
+executeHollow :: Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
+executeHollow draw erase st = runSubmodel ((executeStatement st) >>
+   (do
+       records <- getRecords
+       clearRecords  
+       addRecords $ hollowRecords records draw erase))
+
+hollowRecords :: [RecordedActions] -> Parser.Expr -> Parser.Expr -> [RecordedActions]
+hollowRecords records draw erase = concat $ List.map (\action -> hollow action draw erase) records
+
+hollow :: RecordedActions -> Parser.Expr -> Parser.Expr -> [RecordedActions]
+hollow (DRAW, pos) d _ = [(DRAW, pos), (ERASE, hollowOut d pos)]
+hollow (ERASE, pos) _ e =  [(ERASE, pos), (DRAW, hollowOut e pos)]
+hollow (MOVE, pos) _ _ = [(MOVE, pos)]
+
+
+hollowOut :: Parser.Expr -> [Position] -> [Position]
+hollowOut (EXP_NUM draw) positions = List.map (\(vect, radius) -> (vect, radius-draw)) positions
+
+executeInvert :: Parser.Statement -> Model ()
+executeInvert st = runSubmodel ((executeStatement st)>> 
+    (do
+        records <- getRecords
+        clearRecords
+        addRecords $ invertRecords records))
+
+invertRecords :: [RecordedActions] -> [RecordedActions]
+invertRecords = List.map invert
+
+invert :: RecordedActions -> RecordedActions
+invert (DRAW, pos) = (ERASE, pos)
+invert (ERASE, pos) = (DRAW, pos)
+invert (MOVE, pos) = (MOVE, pos)
 
 executeMove :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
 executeMove xExpr yExpr zExpr rExpr statement = do

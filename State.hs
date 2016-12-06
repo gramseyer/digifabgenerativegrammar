@@ -1,4 +1,4 @@
-module State (Model, RecordedActions, Action (DRAW, MOVE, ERASE), Vector, Position, evalModel,getRecords, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State (Model, RecordedActions, Action (DRAW, MOVE, ERASE), Vector, Position, evalModel,getRecords, addRecords, clearRecords, runSubmodel, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
@@ -35,12 +35,24 @@ data EphemeralState = EPHEMERAL [Map.Map Parser.Identifier Float]
 
 data TotalState = TOTAL FixedState EphemeralState PersistState
 
-type Model a = ExceptT String (State TotalState) a --StateT s (Either String) TotalState
+type Model a = ExceptT String (State TotalState) a
 
 evalModel :: Model a -> a
 evalModel model = case fst.runModel $ model of
     Left errorMsg -> error errorMsg
     Right x -> x
+
+runSubmodel :: Model () -> Model ()
+runSubmodel submodel = do
+    headState <- getHeadState
+    addRecords $ (evalModelOnState submodel headState)
+
+evalModelOnState :: Model () -> HeadState -> [RecordedActions]
+evalModelOnState model headState = case 
+    fst $ runState (runExceptT (model>>getRecords)) (makeInitialState headState)
+    of
+        Left errorMsg -> error errorMsg -- could thread this back to the main model
+        Right x -> x
 
 runModel :: Model a -> (Either String a, TotalState)
 runModel model = runState (runExceptT model) initialState
@@ -48,8 +60,11 @@ runModel model = runState (runExceptT model) initialState
 initialHeadState :: HeadState
 initialHeadState = HEADSTATE ((0,0,0), 0) (ORIENT (1,0,0) (0,1,0) (0,0,1)) DRAW
 
+makeInitialState :: HeadState -> TotalState
+makeInitialState h = TOTAL (FIXED Map.empty) (EPHEMERAL [Map.empty]) (PERSIST h [] ([],[]))
+
 initialState :: TotalState
-initialState = TOTAL (FIXED Map.empty) (EPHEMERAL [Map.empty]) (PERSIST initialHeadState [] ([],[]))
+initialState = makeInitialState initialHeadState
 
 getHeadState :: Model HeadState
 getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) ->  (h,(TOTAL f e (PERSIST h stk records)))
@@ -191,3 +206,9 @@ setMove = setAction MOVE
 
 getRecords :: Model [RecordedActions]
 getRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (records ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))))  
+
+clearRecords :: Model ()
+clearRecords = state $ \(TOTAL f e (PERSIST h stk _)) ->  (() ,(TOTAL f e (PERSIST h stk ([], []))))
+
+addRecords :: [RecordedActions] -> Model ()
+addRecords newRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (() ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, newRecords ++ records))))  

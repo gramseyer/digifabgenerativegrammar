@@ -1,4 +1,4 @@
-module Parser(Program (PROGRAM), Definition (DEFINE), Statement(ST_MOVE, ST_STACKMANIP, ST_EMPTY, ST_APPLY, ST_COND, ST_ROTATEX, ST_ROTATEY, ST_ROTATEZ, ST_ERASE, ST_DRAW, ST_FREEMOVE), Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram) where
+module Parser(Program (PROGRAM), Definition (DEFINE), Statement(ST_MOVE, ST_STACKMANIP, ST_EMPTY, ST_APPLY, ST_COND, ST_ROTATEX, ST_ROTATEY, ST_ROTATEZ, ST_ERASE, ST_DRAW, ST_FREEMOVE, ST_PERTURB), Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram, Perturbation (P_HOLLOW, P_INVERT)) where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
@@ -14,13 +14,18 @@ data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_EMPTY
                 | ST_APPLY Identifier [Expr] Statement
                 | ST_COND Expr Statement Statement Statement
-                | ST_ROTATEX Expr Statement
+                | ST_ROTATEX Expr  Statement
                 | ST_ROTATEY Expr Statement
                 | ST_ROTATEZ Expr Statement
                 | ST_ERASE Statement
                 | ST_DRAW Statement
                 | ST_FREEMOVE Statement
+                | ST_PERTURB Perturbation Statement
                 deriving Show
+
+data Perturbation = P_HOLLOW Expr Expr Statement -- expr 1 ->  radius for draw expr 2 -> radius for erase 
+                   | P_INVERT Statement -- turn all draw to erase and vice versa 
+                   deriving Show
 
 data Param = PARAM_ID Identifier
             | PARAM_NUM Float
@@ -102,7 +107,35 @@ statement = try stMove
         <|> try stDraw
         <|> try stErase
         <|> try stFreeMove
+        <|> try stPerturb
         <|> stEmpty
+
+stPerturb :: Parser Statement
+stPerturb = try pHollow <|> pInvert 
+
+pHollow :: Parser Statement 
+pHollow = do
+    string "HOLLOW"
+    whiteSpace
+    draw <- topExpr
+    whiteSpace
+    erase <- topExpr
+    whiteSpace
+    s <- statement 
+    char ';'
+    whiteSpace
+    remain <- statement
+    return $ ST_PERTURB (P_HOLLOW draw erase s) remain
+
+pInvert :: Parser Statement
+pInvert = do
+    string "INVERT"
+    whiteSpace
+    s <- statement
+    char ';'
+    whiteSpace
+    remain <- statement
+    return $ ST_PERTURB (P_INVERT s) remain
 
 stMove :: Parser Statement
 stMove = do
