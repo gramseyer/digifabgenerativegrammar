@@ -1,4 +1,34 @@
-module State (Model, RecordedActions, Action (DRAW, MOVE, ERASE), Vector, Position, evalModel,getRecords, addRecords, clearRecords, runSubmodel, rotateX, rotateY, rotateZ, moveDiscretised, setMove, setDraw, setErase, initialState, getHeadState, pushHeadToStack, popHeadFromStack, getVarBindings, pushVarBindings, popVarBindings, addDefinitions, findDefinition) where
+module State(
+    Model,
+    RecordedActions, 
+    Action (
+        DRAW,
+        MOVE,
+        ERASE),
+    Vector,
+    Position,
+    evalModel,
+    getRecords,
+    addRecords,
+    clearRecords,
+    runSubmodel,
+    rotateX,
+    rotateY,
+    rotateZ,
+    moveDiscretised,
+    setMove,
+    setDraw,
+    setErase,
+    initialState,
+    getHeadState,
+    pushHeadToStack,
+    popHeadFromStack,
+    getVarBindings,
+    pushVarBindings,
+    popVarBindings,
+    addDefinitions,
+    findDefinition) where
+
 import Parser
 import qualified Data.Map as Map
 import Control.Monad.State
