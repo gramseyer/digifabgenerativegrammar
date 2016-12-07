@@ -36,8 +36,8 @@ hollowRecords :: Parser.Expr -> Parser.Expr -> [RecordedActions] -> Model ()
 hollowRecords _ _ [] = do (return ())
 hollowRecords draw erase records = List.foldr1 (>>) (List.map (hollowRecord draw erase) records)
 
-mergeFunc :: ([Position] -> Model ([Position])) -> ([Position] -> Model ([Position])) -> ([Position] -> Model ([Position]))
-mergeFunc f g = \poses -> (f poses) >>= g
+mergeFunc :: ([a] -> Model ([a])) -> ([a] -> Model ([a])) -> ([a] -> Model ([a]))
+mergeFunc f g = \values -> (f values) >>= g
 
 hollowRecord :: Parser.Expr -> Parser.Expr -> RecordedActions -> Model ()
 hollowRecord _ _ (_, []) = do (return ())
@@ -176,7 +176,7 @@ mergeModels (xM, yM, zM, rM) = do
     return ((x,y,z),r)
 
 timeRange :: [Float]
-timeRange = [0,0.25..1]
+timeRange = [0,0.05..1]
 
 timeVar :: Parser.Identifier
 timeVar = "t"
@@ -191,6 +191,14 @@ evalTimeExpr expr time = do
     popVarBindings
     return result
 
+accumulateFloats :: Parser.Expr -> [Float] -> Model [Float]
+accumulateFloats expr prev = do
+    result <- evalInternal expr
+    return $ prev ++ [result]
+
+evalArgs :: [Parser.Expr] -> Model ([Float])
+evalArgs exprs = ((List.foldr1 mergeFunc (List.map (\expr -> accumulateFloats expr) exprs)) [])
+
 evalInternal :: Parser.Expr -> Model Float
 evalInternal (Parser.EXP_BINOP e1 e2 func) = liftBinop func (evalInternal e1) (evalInternal e2)
 evalInternal (Parser.EXP_NUM number) = do
@@ -198,6 +206,13 @@ evalInternal (Parser.EXP_NUM number) = do
 evalInternal (Parser.EXP_VAR var) = do
     bindings <- getVarBindings
     (unpackVar var (Map.lookup var bindings))
+evalInternal (Parser.EXP_FUNC (arity, func) args) = if (arity /= List.length args) then
+        throwError ("Mismatched function arity: " ++ show arity ++ " /= " ++ (show $ List.length args))
+    else
+        do
+            inputs <- evalArgs args
+            return $ func inputs
+
 
 liftBinop :: (Float -> Float -> Float) -> Model Float -> Model Float -> Model Float
 liftBinop binop evalExpr1 evalExpr2 = do

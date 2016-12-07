@@ -1,7 +1,38 @@
-module Parser(Program (PROGRAM), Definition (DEFINE), Statement(ST_MOVE, ST_STACKMANIP, ST_EMPTY, ST_APPLY, ST_COND, ST_ROTATEX, ST_ROTATEY, ST_ROTATEZ, ST_ERASE, ST_DRAW, ST_FREEMOVE, ST_PERTURB), Param (PARAM_ID, PARAM_NUM), Expr (EXP_BINOP, EXP_VAR, EXP_NUM), Identifier, parseProgram, Perturbation (P_HOLLOW, P_INVERT)) where
+module Parser(Program (PROGRAM),
+              Definition (DEFINE),
+              Statement(
+                ST_MOVE,
+                ST_STACKMANIP,
+                ST_EMPTY,
+                ST_APPLY,
+                ST_COND,
+                ST_ROTATEX,
+                ST_ROTATEY, 
+                ST_ROTATEZ,
+                ST_ERASE,
+                ST_DRAW,
+                ST_FREEMOVE,
+                ST_PERTURB),
+              Param (
+                PARAM_ID,
+                PARAM_NUM),
+              Expr (
+                EXP_BINOP,
+                EXP_VAR,
+                EXP_NUM,
+                EXP_FUNC),
+              Identifier,
+              parseProgram,
+              Perturbation (
+                P_HOLLOW,
+                P_INVERT)
+              )
+    where
 
 import Text.ParserCombinators.Parsec
 import System.Environment
+import Data.Map as Map
+import Data.List as List
 
 data Program = PROGRAM [Definition] Statement
                 deriving Show
@@ -33,7 +64,8 @@ data Param = PARAM_ID Identifier
 
 data Expr = EXP_BINOP Expr Expr (Float -> Float -> Float)
             | EXP_VAR Identifier
-            | EXP_NUM Float  
+            | EXP_NUM Float
+            | EXP_FUNC (Int, [Float] -> Float) [Expr] -- (arity, function) (expressions)
 
 instance Show Expr where
     show (EXP_VAR identifier) = "EXP_VAR " ++ (show identifier)
@@ -45,10 +77,26 @@ instance Show Expr where
             1 -> "EXP_DIV " ++ (showBinop e1 e2)
             _ -> "EXP_BINOP " ++ (showBinop e1 e2)
             where
-
-showBinop e1 e2 = "(" ++ (show e1) ++ ") (" ++ (show e2) ++")"
+                showBinop e1 e2 = "(" ++ (show e1) ++ ") (" ++ (show e2) ++")"
+    show (EXP_FUNC (arity, _) vars) = "EXP_FUNC " ++ (show arity) ++ " " ++ (show vars)
 
 type Identifier = String
+
+-- Arity is validated later
+sinFunc :: [Float] -> Float
+sinFunc [x] = sin (pi*x/180)
+sinFunc _ = -2
+
+cosFunc :: [Float] -> Float
+cosFunc [x] = cos (pi*x/180)
+cosFunc _ = -2
+
+sqrtFunc :: [Float] -> Float
+sqrtFunc [x] = sqrt x
+sqrtFunc _ = -1
+
+basisFunctions :: Map Identifier (Int, [Float] -> Float)
+basisFunctions = Map.fromList [("sin", (1, sinFunc)), ("cos", (1, cosFunc)), ("sqrt", (1, sqrtFunc))]
 
 parseProgram :: String -> Program
 parseProgram str = case parse program "Invalid Parse" str of
@@ -314,7 +362,7 @@ divExpr = do
 
 terminalExpr :: Parser Expr
 terminalExpr = do
-    result <- (try topExpr <|> try varExpr <|> numExpr)
+    result <- (try topExpr <|> try funcExpr <|> varExpr <|> numExpr)
     whiteSpace
     return result
 
@@ -332,6 +380,20 @@ varExpr = do
 
 numExpr :: Parser Expr
 numExpr = try negExpr <|> posExpr
+
+lookupFunc :: Identifier -> Parser (Int, [Float] -> Float)
+lookupFunc funcName = case (Map.lookup funcName basisFunctions)
+    of Just func -> return func
+       Nothing -> fail $ "Function " ++ funcName ++ " not a valid basis function"
+
+funcExpr :: Parser Expr
+funcExpr = do
+    funcName <- identifier
+    params <- many1 (do whiteSpace
+                        topExpr)
+    whiteSpace
+    function <- lookupFunc funcName
+    return $ EXP_FUNC function params
 
 floatParse :: Parser Float
 floatParse = do
