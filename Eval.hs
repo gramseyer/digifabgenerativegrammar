@@ -26,27 +26,35 @@ executeStatement statement = case statement of
 
 executePerturb :: Parser.Perturbation -> Parser.Statement -> Model ()
 executePerturb p remain =  case p of
-    (Parser.P_INVERT st)            -> executeInvert st
-    (Parser.P_HOLLOW draw erase st) -> executeHollow draw erase st 
+    (Parser.P_INVERT st)            -> executeInvert st >> executeStatement remain
+    (Parser.P_HOLLOW draw erase st) -> executeHollow draw erase st  >> executeStatement remain
 
-executeHollow :: Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
-executeHollow draw erase st = runSubmodel ((executeStatement st) >>
-   (do
-       records <- getRecords
-       clearRecords  
-       addRecords $ hollowRecords records draw erase))
+executeHollow :: Parser.Expr -> Parser.Expr -> Parser.Statement -> Model()
+executeHollow drawExpr eraseExpr st = runSubmodel ((executeStatement st) >> getRecords >>= (hollowRecords drawExpr eraseExpr))
 
-hollowRecords :: [RecordedActions] -> Parser.Expr -> Parser.Expr -> [RecordedActions]
-hollowRecords records draw erase = concat $ List.map (\action -> hollow action draw erase) records
+hollowRecords :: Parser.Expr -> Parser.Expr -> [RecordedActions] -> Model ()
+hollowRecords _ _ [] = do (return ())
+hollowRecords draw erase records = List.foldr1 (>>) (List.map (hollowRecord draw erase) records)
 
-hollow :: RecordedActions -> Parser.Expr -> Parser.Expr -> [RecordedActions]
-hollow (DRAW, pos) d _ = [(DRAW, pos), (ERASE, hollowOut d pos)]
-hollow (ERASE, pos) _ e =  [(ERASE, pos), (DRAW, hollowOut e pos)]
-hollow (MOVE, pos) _ _ = [(MOVE, pos)]
+mergeFunc :: ([Position] -> Model ([Position])) -> ([Position] -> Model ([Position])) -> ([Position] -> Model ([Position]))
+mergeFunc f g = \poses -> (f poses) >>= g
 
+hollowRecord :: Parser.Expr -> Parser.Expr -> RecordedActions -> Model ()
+hollowRecord _ _ (_, []) = do (return ())
+hollowRecord draw erase (MOVE, positions) = do (return ())
+hollowRecord draw erase (DRAW, positions) = 
+    ((List.foldr1 mergeFunc (List.map (\pos -> hollowPoint draw pos) positions)) [])
+    >>= (\positions -> addRecords [(ERASE, positions)])
+hollowRecord draw erase (ERASE, positions) = 
+    ((List.foldr1 mergeFunc (List.map (\pos -> hollowPoint erase pos) positions)) [])
+    >>= (\positions -> addRecords [(DRAW, positions)])
 
-hollowOut :: Parser.Expr -> [Position] -> [Position]
-hollowOut (EXP_NUM draw) positions = List.map (\(vect, radius) -> (vect, radius-draw)) positions
+hollowPoint :: Parser.Expr -> Position -> [Position] -> Model ([Position])
+hollowPoint expr (loc, r) processed = do
+    pushVarBindings [("r", r)] 
+    newRadius <- evalInternal expr
+    popVarBindings
+    return $ ((loc, newRadius):processed)
 
 executeInvert :: Parser.Statement -> Model ()
 executeInvert st = runSubmodel ((executeStatement st)>> 

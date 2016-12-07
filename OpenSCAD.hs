@@ -8,7 +8,7 @@ type Writer a = State (String, String) a
 
 getOpenSCADStr :: [State.RecordedActions] -> String
 getOpenSCADStr positions = snd $ 
-    evalState (((generateOpenSCAD.mergeRecords) positions) >> get) ("", "")
+    evalState (((generateOpenSCAD) positions) >> get) ("", "")
 
 generateOpenSCAD :: [State.RecordedActions] -> Writer ()
 generateOpenSCAD ((State.MOVE, positions) : xs) = do
@@ -36,7 +36,7 @@ mergeRecords [] = []
 writeAction :: State.Action -> Writer ()
 writeAction action = case action of
     State.DRAW -> putLine $ "union () {"
-    State.ERASE -> putLine $ "intersection () {"
+    State.ERASE -> putLine $ "difference () {"
     _ -> error "move in action"
 
 indentUp :: Writer ()
@@ -57,7 +57,10 @@ putLine str = do
     put (indent, (prev ++ indent ++ str ++ "\n"))
 
 generateMotion :: [State.Position] -> Writer ()
-generateMotion positions = List.foldr1 (>>) $
+generateMotion positions =
+    (\poses -> case poses of
+                [] -> return ()
+                _ -> List.foldr1 (>>) poses) $
     List.map (generateJoint) $
         List.filter filterRenderableObjects $
             List.zip positions (List.tail positions)
