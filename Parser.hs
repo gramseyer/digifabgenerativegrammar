@@ -39,6 +39,7 @@ data Program = PROGRAM [Definition] Statement
 data Definition = DEFINE Identifier [Identifier] Statement
                   deriving Show
 
+-- A description of these statements can be found in the project grammar.
 data Statement = ST_MOVE Expr Expr Expr Expr Statement
                 | ST_STACKMANIP Statement Statement
                 | ST_EMPTY
