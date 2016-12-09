@@ -38,7 +38,7 @@ DRAW; MOVE (40\*t) (8\*t\*t) (12\*t\*t\*t\*t) (3\*t); MOVE (0) (30\*t) (0) (~1);
 
 #### Language Description
 
-`
+```
 Program : Definition* Statement
         ;
 
@@ -69,4 +69,4 @@ Identifier : [a-zA-Z]*
 Expr : (the usual rightmost expression parse tree, with proper associativity.  Allows some basis function calls like sin/cos)
 
 
-`
+```
