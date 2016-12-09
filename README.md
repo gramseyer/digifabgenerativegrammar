@@ -42,7 +42,7 @@ DRAW; MOVE (40\*t) (8\*t\*t) (12\*t\*t\*t\*t) (3\*t); MOVE (0) (30\*t) (0) (~1);
 Program : Definition* Statement
         ;
 
-Definition : "(" "DEFINE" "(" (Identifier*) ")" Statement ")"
+Definition : "(" "DEFINE" Identifier "(" (Identifier*) ")" Statement ")"
 		   ;
 
 Statement : MOVE Expr Expr Expr Expr ";" Statement
@@ -66,7 +66,8 @@ Perturb : "HOLLOW" Expr Expr Statement ";"
 Identifier : [a-zA-Z]*
 		   ;
 
-Expr : (the usual rightmost expression parse tree, with proper associativity.  Allows some basis function calls like sin/cos)
+Expr : (the usual rightmost expression parse tree, with proper associativity. 
+        Allows some basis function calls - things like sin, cos, sqrt)
 
 
 ```
