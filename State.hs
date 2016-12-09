@@ -75,11 +75,13 @@ evalModel model = case fst.runModel $ model of
 runSubmodel :: Model () -> Model ()
 runSubmodel submodel = do
     headState <- getHeadState
-    addRecords $ (evalModelOnState submodel headState)
+    fixedState <- getFixedState
+    varBindings <- getVarBindings
+    addRecords $ (evalModelOnState submodel headState fixedState varBindings)
 
-evalModelOnState :: Model () -> HeadState -> [RecordedActions]
-evalModelOnState model headState = case 
-    fst $ runState (runExceptT (model>>getRecords)) (makeInitialState headState)
+evalModelOnState :: Model () -> HeadState -> FixedState -> Map.Map Parser.Identifier Float -> [RecordedActions]
+evalModelOnState model headState fixedState topBindings = case 
+    fst $ runState (runExceptT (model>>getRecords)) (makeInitialState headState fixedState topBindings)
     of
         Left errorMsg -> error errorMsg -- could thread this back to the main model
         Right x -> x
@@ -90,11 +92,14 @@ runModel model = runState (runExceptT model) initialState
 initialHeadState :: HeadState
 initialHeadState = HEADSTATE ((0,0,0), 0) (ORIENT (1,0,0) (0,1,0) (0,0,1)) DRAW
 
-makeInitialState :: HeadState -> TotalState
-makeInitialState h = TOTAL (FIXED Map.empty) (EPHEMERAL [Map.empty]) (PERSIST h [] ([],[]))
+makeInitialState :: HeadState -> FixedState -> Map.Map Parser.Identifier Float -> TotalState
+makeInitialState h f topBindings = TOTAL f (EPHEMERAL [topBindings]) (PERSIST h [] ([],[]))
 
 initialState :: TotalState
-initialState = makeInitialState initialHeadState
+initialState = makeInitialState initialHeadState (FIXED Map.empty) (Map.empty)
+
+getFixedState :: Model FixedState
+getFixedState = state $ \(TOTAL f e p) ->  (f,(TOTAL f e p))
 
 getHeadState :: Model HeadState
 getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) ->  (h,(TOTAL f e (PERSIST h stk records)))
@@ -115,14 +120,18 @@ pushVarBindings bindings = state $ \(TOTAL f (EPHEMERAL (oldBindings : stk)) p) 
 popVarBindings :: Model (Map.Map Parser.Identifier Float)
 popVarBindings = state $ \(TOTAL f (EPHEMERAL (m:m')) p) -> (m, TOTAL f (EPHEMERAL m') p)
 
-addBinding :: (Parser.Identifier, Float) -> Map.Map Parser.Identifier Float -> Map.Map Parser.Identifier Float
+addBinding :: (Parser.Identifier, Float)
+           -> Map.Map Parser.Identifier Float
+           -> Map.Map Parser.Identifier Float
 addBinding (key, value) bindings = Map.insert key value bindings
 
 addDefinitions :: [Parser.Definition] -> Model ()
 addDefinitions funcs = state $ \(TOTAL (FIXED prevMap) e p) -> 
                             ((), TOTAL (FIXED (List.foldr addDefinition prevMap funcs)) e p)
 
-addDefinition :: Parser.Definition -> Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement) -> Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement)
+addDefinition :: Parser.Definition
+              -> Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement)
+              -> Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement)
 addDefinition (DEFINE name args statement) defns = Map.insert name (args, statement) defns
 
 getDefinitions :: Model (Map.Map Parser.Identifier ([Parser.Identifier], Parser.Statement))
@@ -133,7 +142,9 @@ findDefinition identifier = do
     defns <- getDefinitions
     unpackDefn identifier (Map.lookup identifier defns)
 
-unpackDefn :: Parser.Identifier -> Maybe ([Parser.Identifier], Parser.Statement) -> Model ([Parser.Identifier], Parser.Statement)
+unpackDefn :: Parser.Identifier
+           -> Maybe ([Parser.Identifier], Parser.Statement)
+           -> Model ([Parser.Identifier], Parser.Statement)
 unpackDefn var Nothing = throwError ("Function " ++ var ++ " is not defined")
 unpackDefn _ (Just result) = do
     return result
@@ -146,7 +157,10 @@ makeList :: Vector -> [Float]
 makeList (x,y,z) = [x,y,z]
 
 rotateVectorByVector :: Float -> Vector -> Vector -> Vector
-rotateVectorByVector theta vOfRot (vx, vy, vz) = makeVector $ List.map (List.foldr (+) 0) (List.map (List.zipWith (*) [vx, vy, vz]) (getRotationMatrix vOfRot theta))
+rotateVectorByVector theta vOfRot (vx, vy, vz) = makeVector $
+    List.map
+        (List.foldr (+) 0)
+        (List.map (List.zipWith (*) [vx, vy, vz]) (getRotationMatrix vOfRot theta))
 
 getRotationMatrix :: Vector -> Float -> [[Float]]
 getRotationMatrix (vx,vy,vz) theta =
@@ -209,7 +223,9 @@ endLogPosSet :: Model ()
 endLogPosSet = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o a) stk ([], (a, recording):recorded))))   
 
 setPos :: Position -> Model ()
-setPos pos = state $ \(TOTAL f e (PERSIST (HEADSTATE _ o a) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE pos o a) stk records)))   
+setPos pos = state $
+    \(TOTAL f e (PERSIST (HEADSTATE _ o a) stk records))
+        ->  ((),(TOTAL f e (PERSIST (HEADSTATE pos o a) stk records)))   
 
 moveDiscretised :: [Position] -> Model ()
 moveDiscretised poses = do
@@ -223,7 +239,9 @@ moveDiscretised poses = do
         (lastPos, r) = List.last poses
 
 setAction :: Action -> Model ()
-setAction action = state $ \(TOTAL f e (PERSIST (HEADSTATE p o _) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o action) stk records)))
+setAction action = state $
+    \(TOTAL f e (PERSIST (HEADSTATE p o _) stk records))
+        -> ((),(TOTAL f e (PERSIST (HEADSTATE p o action) stk records)))
 
 setDraw :: Model ()
 setDraw = setAction DRAW

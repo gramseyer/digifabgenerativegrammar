@@ -176,7 +176,7 @@ mergeModels (xM, yM, zM, rM) = do
     return ((x,y,z),r)
 
 timeRange :: [Float]
-timeRange = [0,0.25..1]
+timeRange = [0,0.05..1]
 
 timeVar :: Parser.Identifier
 timeVar = "t"
