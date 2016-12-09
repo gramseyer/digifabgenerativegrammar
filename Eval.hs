@@ -13,7 +13,7 @@ executeStatement :: Parser.Statement -> Model ()
 executeStatement statement = case statement of
     (Parser.ST_MOVE x y z r st)             -> executeMove x y z r st
     (Parser.ST_STACKMANIP st st')           -> executeStackManip st st'
-    (Parser.ST_EMPTY)                       -> executeEmpty 
+    (Parser.ST_EMPTY)                       -> return () 
     (Parser.ST_APPLY identifier params st)  -> executeApply identifier params st
     (Parser.ST_COND expr st1 st2 st')       -> executeCond expr st1 st2 st'
     (Parser.ST_ROTATEX expr st)             -> executeRotateX expr st
@@ -24,13 +24,75 @@ executeStatement statement = case statement of
     (Parser.ST_DRAW st)                     -> setDraw >> (executeStatement st)
     (Parser.ST_PERTURB p st)                -> executePerturb p st
 
+executeMove :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
+executeMove xExpr yExpr zExpr rExpr statement = do
+    poses <- generatePositions xExpr yExpr zExpr rExpr
+    moveDiscretised poses
+    executeStatement statement
+
+executeStackManip :: Parser.Statement -> Parser.Statement -> Model ()
+executeStackManip statement rest = do
+    pushHeadToStack
+    executeStatement statement
+    popHeadFromStack
+    executeStatement rest
+
+executeApply :: Parser.Identifier -> [Parser.Expr] -> Parser.Statement -> Model ()
+executeApply funcName funcArgs rest = do
+    bindings <- getVarBindings
+    (argNames, statement) <- findDefinition funcName
+    bindings <- makeParamBindings funcArgs argNames
+    pushVarBindings bindings
+    executeStatement statement
+    popVarBindings
+    executeStatement rest
+    where
+        unJust (Just x) = x
+        unJust Nothing = error "This should have been checked earlier"
+
+makeParamBindings :: [Parser.Expr] -> [Parser.Identifier] -> Model ([(Parser.Identifier, Float)])
+makeParamBindings (expr : exprs) (iden : idens) = do
+    evaluated <- evalInternal expr
+    rest <- makeParamBindings exprs idens
+    return $ (iden, evaluated) : rest
+makeParamBindings [] [] = do
+    return []
+makeParamBindings _ _ = error "Non matching number of arguments/parameters."
+
+executeCond :: Parser.Expr -> Parser.Statement -> Parser.Statement -> Parser.Statement -> Model ()
+executeCond expr branch1 branch2 rest = do
+    cond <- evalInternal expr 
+    if (cond >= 0)
+        then executeStatement branch1
+        else executeStatement branch2
+    executeStatement rest
+
+executeRotateX :: Parser.Expr -> Parser.Statement -> Model ()
+executeRotateX expr statement = do
+    theta <- evalInternal expr
+    rotateX theta
+    executeStatement statement
+
+executeRotateY :: Parser.Expr -> Parser.Statement -> Model ()
+executeRotateY expr statement = do
+    theta <- evalInternal expr
+    rotateY theta
+    executeStatement statement
+
+executeRotateZ :: Parser.Expr -> Parser.Statement -> Model ()
+executeRotateZ expr statement = do
+    theta <- evalInternal expr
+    rotateZ theta
+    executeStatement statement
+
 executePerturb :: Parser.Perturbation -> Parser.Statement -> Model ()
 executePerturb p remain =  case p of
     (Parser.P_INVERT st)            -> executeInvert st >> executeStatement remain
     (Parser.P_HOLLOW draw erase st) -> executeHollow draw erase st  >> executeStatement remain
 
 executeHollow :: Parser.Expr -> Parser.Expr -> Parser.Statement -> Model()
-executeHollow drawExpr eraseExpr st = runSubmodel ((executeStatement st) >> getRecords >>= (hollowRecords drawExpr eraseExpr))
+executeHollow drawExpr eraseExpr st =
+    runSubmodel ((executeStatement st) >> getRecords >>= (hollowRecords drawExpr eraseExpr))
 
 hollowRecords :: Parser.Expr -> Parser.Expr -> [RecordedActions] -> Model ()
 hollowRecords _ _ [] = do (return ())
@@ -70,71 +132,6 @@ invert :: RecordedActions -> RecordedActions
 invert (DRAW, pos) = (ERASE, pos)
 invert (ERASE, pos) = (DRAW, pos)
 invert (MOVE, pos) = (MOVE, pos)
-
-executeMove :: Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Expr -> Parser.Statement -> Model ()
-executeMove xExpr yExpr zExpr rExpr statement = do
-    poses <- generatePositions xExpr yExpr zExpr rExpr
-    moveDiscretised poses
-    executeStatement statement
-
-executeStackManip :: Parser.Statement -> Parser.Statement -> Model ()
-executeStackManip statement rest = do
-    pushHeadToStack
-    executeStatement statement
-    popHeadFromStack
-    executeStatement rest
-
-executeCond :: Parser.Expr -> Parser.Statement -> Parser.Statement -> Parser.Statement -> Model ()
-executeCond expr branch1 branch2 rest = do
-    cond <- evalInternal expr 
-    if (cond >= 0)
-        then executeStatement branch1
-        else executeStatement branch2
-    executeStatement rest
-
-executeEmpty :: Model ()
-executeEmpty = do
-    return ()
-
-makeParamBindings :: [Parser.Expr] -> [Parser.Identifier] -> Model ([(Parser.Identifier, Float)])
-makeParamBindings (expr : exprs) (iden : idens) = do
-    evaluated <- evalInternal expr
-    rest <- makeParamBindings exprs idens
-    return $ (iden, evaluated) : rest
-makeParamBindings [] [] = do
-    return []
-makeParamBindings _ _ = error "Non matching number of arguments/parameters."
-
-executeApply :: Parser.Identifier -> [Parser.Expr] -> Parser.Statement -> Model ()
-executeApply funcName funcArgs rest = do
-    bindings <- getVarBindings
-    (argNames, statement) <- findDefinition funcName
-    bindings <- makeParamBindings funcArgs argNames
-    pushVarBindings bindings
-    executeStatement statement
-    popVarBindings
-    executeStatement rest
-    where
-        unJust (Just x) = x
-        unJust Nothing = error "This should have been checked earlier"
-
-executeRotateX :: Parser.Expr -> Parser.Statement -> Model ()
-executeRotateX expr statement = do
-    theta <- evalInternal expr
-    rotateX theta
-    executeStatement statement
-
-executeRotateY :: Parser.Expr -> Parser.Statement -> Model ()
-executeRotateY expr statement = do
-    theta <- evalInternal expr
-    rotateY theta
-    executeStatement statement
-
-executeRotateZ :: Parser.Expr -> Parser.Statement -> Model ()
-executeRotateZ expr statement = do
-    theta <- evalInternal expr
-    rotateZ theta
-    executeStatement statement
 
 loadParam :: Map.Map Parser.Identifier Float -> Parser.Param -> Maybe Float
 loadParam bindings (PARAM_NUM num) = Just num
@@ -224,4 +221,3 @@ unpackVar :: Parser.Identifier -> Maybe Float -> Model Float
 unpackVar var Nothing = throwError ("Variable " ++ var ++ " not found")
 unpackVar _ (Just result) = do
     return result
-

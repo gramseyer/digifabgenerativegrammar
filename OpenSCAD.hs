@@ -84,3 +84,4 @@ generateSphere ((x, y, z), r) = do
     putLine $ "sphere(r = " ++ (show r) ++ ");"
     indentDown
     putLine $ "}"
+    

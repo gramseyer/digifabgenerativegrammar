@@ -79,7 +79,11 @@ runSubmodel submodel = do
     varBindings <- getVarBindings
     addRecords $ (evalModelOnState submodel headState fixedState varBindings)
 
-evalModelOnState :: Model () -> HeadState -> FixedState -> Map.Map Parser.Identifier Float -> [RecordedActions]
+evalModelOnState :: Model ()
+                 -> HeadState
+                 -> FixedState
+                 -> Map.Map Parser.Identifier Float
+                 -> [RecordedActions]
 evalModelOnState model headState fixedState topBindings = case 
     fst $ runState (runExceptT (model>>getRecords)) (makeInitialState headState fixedState topBindings)
     of
@@ -102,20 +106,27 @@ getFixedState :: Model FixedState
 getFixedState = state $ \(TOTAL f e p) ->  (f,(TOTAL f e p))
 
 getHeadState :: Model HeadState
-getHeadState = state $ \(TOTAL f e (PERSIST h stk records)) ->  (h,(TOTAL f e (PERSIST h stk records)))
+getHeadState = state $
+    \(TOTAL f e (PERSIST h stk records))
+        -> (h,(TOTAL f e (PERSIST h stk records)))
 
 pushHeadToStack :: Model ()
-pushHeadToStack = state $ \(TOTAL f e (PERSIST h stk records)) -> ((), TOTAL f e (PERSIST h (h:stk) records))
+pushHeadToStack = state $
+    \(TOTAL f e (PERSIST h stk records))
+        -> ((), TOTAL f e (PERSIST h (h:stk) records))
 
 popHeadFromStack :: Model HeadState
-popHeadFromStack = state $ \(TOTAL f e (PERSIST old (h:stk) records)) -> (old, TOTAL f e (PERSIST h stk records))
+popHeadFromStack = state $
+    \(TOTAL f e (PERSIST old (h:stk) records))
+        -> (old, TOTAL f e (PERSIST h stk records))
 
 getVarBindings :: Model (Map.Map Parser.Identifier Float)
 getVarBindings = state $ \(TOTAL f (EPHEMERAL (m:m')) p) -> (m, TOTAL f (EPHEMERAL (m:m')) p)
 
 pushVarBindings :: [(Parser.Identifier, Float)] -> Model ()
-pushVarBindings bindings = state $ \(TOTAL f (EPHEMERAL (oldBindings : stk)) p) ->
-                                ((), TOTAL f (EPHEMERAL ((List.foldr addBinding oldBindings bindings) : (oldBindings : stk))) p)
+pushVarBindings bindings = state $
+    \(TOTAL f (EPHEMERAL (oldBindings : stk)) p)
+        -> ((), TOTAL f (EPHEMERAL ((List.foldr addBinding oldBindings bindings) : (oldBindings : stk))) p)
 
 popVarBindings :: Model (Map.Map Parser.Identifier Float)
 popVarBindings = state $ \(TOTAL f (EPHEMERAL (m:m')) p) -> (m, TOTAL f (EPHEMERAL m') p)
@@ -195,10 +206,14 @@ rotate v theta = do
         rotateFunc = rotateVectorByVector theta v
 
 getOrientation :: Model Orientation
-getOrientation = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)) ->  (o,(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)))   
+getOrientation = state $
+    \(TOTAL f e (PERSIST (HEADSTATE p o a) stk records))
+        -> (o,(TOTAL f e (PERSIST (HEADSTATE p o a) stk records)))   
 
 putOrientation :: Orientation -> Model ()
-putOrientation orientation = state $ \(TOTAL f e (PERSIST (HEADSTATE p _ a) stk records)) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p orientation a) stk records)))   
+putOrientation orientation = state $
+    \(TOTAL f e (PERSIST (HEADSTATE p _ a) stk records))
+        -> ((),(TOTAL f e (PERSIST (HEADSTATE p orientation a) stk records)))   
 
 adjustForOrientation :: Orientation -> Vector -> Vector
 adjustForOrientation (ORIENT vx vy vz) v = makeVector $
@@ -217,10 +232,14 @@ logPos (v, r) = do
     pushLogToStk $ addPoses base ((adjustForOrientation o v), r)
 
 pushLogToStk :: Position -> Model ()
-pushLogToStk newPos = state $ \(TOTAL f e (PERSIST h stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST h stk (newPos: recording, recorded))))   
+pushLogToStk newPos = state $
+    \(TOTAL f e (PERSIST h stk (recording, recorded)))
+        -> ((),(TOTAL f e (PERSIST h stk (newPos: recording, recorded))))   
 
 endLogPosSet :: Model ()
-endLogPosSet = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, recorded))) ->  ((),(TOTAL f e (PERSIST (HEADSTATE p o a) stk ([], (a, recording):recorded))))   
+endLogPosSet = state $
+    \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, recorded)))
+        -> ((),(TOTAL f e (PERSIST (HEADSTATE p o a) stk ([], (a, recording):recorded))))   
 
 setPos :: Position -> Model ()
 setPos pos = state $
@@ -253,10 +272,14 @@ setMove :: Model ()
 setMove = setAction MOVE
 
 getRecords :: Model [RecordedActions]
-getRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (records ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))))  
+getRecords = state $
+    \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records)))
+        -> (records ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))))  
 
 clearRecords :: Model ()
-clearRecords = state $ \(TOTAL f e (PERSIST h stk _)) ->  (() ,(TOTAL f e (PERSIST h stk ([], []))))
+clearRecords = state $ \(TOTAL f e (PERSIST h stk _)) -> (() ,(TOTAL f e (PERSIST h stk ([], []))))
 
 addRecords :: [RecordedActions] -> Model ()
-addRecords newRecords = state $ \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records))) ->  (() ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, newRecords ++ records))))  
+addRecords newRecords = state $
+    \(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, records)))
+        -> (() ,(TOTAL f e (PERSIST (HEADSTATE p o a) stk (recording, newRecords ++ records))))  
